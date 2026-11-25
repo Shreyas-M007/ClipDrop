@@ -20,13 +20,13 @@ export function createScratchpad({ textarea, status, request, cleared }) {
     if (!target || state !== target || target.polling || document.hidden) return;
     target.polling = true;
     try {
-      const headers = target.etag ? { "If-None-Match": target.etag } : {};
+      const headers = target.revision ? { "X-Pad-Revision": target.revision } : {};
       const response = await request(target.room, "pad", { headers, signal: target.controller.signal });
-      if (state !== target || response.status === 304) return;
+      if (state !== target) return;
       const value = await response.json();
       if (state !== target) return;
-      target.etag = response.headers.get("ETag");
-      apply(target.doc, value.state);
+      target.revision = value.revision;
+      if (!value.unchanged) apply(target.doc, value.state);
       textarea.disabled = false;
       if (!target.updates.length) status("");
     } catch (error) {

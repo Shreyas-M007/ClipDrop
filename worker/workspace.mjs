@@ -67,13 +67,12 @@ async function handleWorkspace(request, bucket, context, roomKey, roomObject, ro
   const key = partition + "/workspace/pad";
   if (request.method === "GET") {
     const stored = await bucket.get(key);
-    if (stored && request.headers.get("If-None-Match") === '"' + stored.etag + '"') {
-      return new Response(null, { status: 304, headers: policy });
+    const revision = stored?.etag ?? null;
+    if (revision && request.headers.get("X-Pad-Revision") === revision) {
+      return json({ generation: current, revision, unchanged: true });
     }
     const data = stored ? new Uint8Array(await stored.arrayBuffer()) : null;
-    const response = json({ generation: current, state: data ? encodeUpdate(data) : "" });
-    if (stored) response.headers.set("ETag", '"' + stored.etag + '"');
-    return response;
+    return json({ generation: current, revision, state: data ? encodeUpdate(data) : "" });
   }
   if (request.method !== "POST") return error("Unsupported scratchpad action.", 405);
   const input = await readBoundedBlob(request, WEB_PAD_LIMIT);
