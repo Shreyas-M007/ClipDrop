@@ -6,23 +6,16 @@
 }
 
 @font-face {
-  font-family: "Instrument Serif";
-  src: url("/instrument-serif-latin-400-normal.woff2") format("woff2");
+  font-family: Anton;
+  src: url("/anton-latin-400-normal.woff2") format("woff2");
   font-weight: 400;
-  font-display: swap;
-}
-@font-face {
-  font-family: "Instrument Serif";
-  src: url("/instrument-serif-latin-400-italic.woff2") format("woff2");
-  font-weight: 400;
-  font-style: italic;
   font-display: swap;
 }
 
 :root {
   color-scheme: light;
-  --page: #f9fbf6;
-  --card: #fffefa;
+  --page: #fbf8ec;
+  --card: #fffaf0;
   --soft: #edf3eb;
   --ink: #14271e;
   --muted: #4e6457;
@@ -39,12 +32,19 @@
   --accent-tint: #e0eee1;
   --leaf-tint: #e7eedf;
   --leaf-text: #405b37;
-  --stage-bg: #d8eadb;
-  --art-line: #76a98a;
-  --hero-accent: #24694b;
-  --hero-shadow: #2450382b;
+  --poster: #d6f246;
+  --poster-ink: #193529;
+  --poster-band: #c2e03b;
+  --poster-contrast: #a9d870;
+  --poster-word: #fff5d3;
+  --poster-strong: #294f36;
+  --poster-pink: #ffb1cf;
+  --paper-stage: #e3efc1;
+  --tape: #f7d765;
+  --tape-ink: #664e3038;
   --error: #a12840;
   --shadow: 0 2px 4px #183b2810;
+  --dialog-shadow: #2450382b;
   --radius: 15px;
   --control-radius: .65rem;
   --gutter: clamp(18px, 4.3vw, 68px);
@@ -70,12 +70,19 @@
   --accent-tint: #2c4936;
   --leaf-tint: #34442c;
   --leaf-text: #cde1b7;
-  --stage-bg: #253d30;
-  --art-line: #527d61;
-  --hero-accent: #b0dfb8;
-  --hero-shadow: #07180e70;
+  --poster: #365226;
+  --poster-ink: #eff8c7;
+  --poster-band: #45612a;
+  --poster-contrast: #2c4227;
+  --poster-word: #21362a;
+  --poster-strong: #ddedb1;
+  --poster-pink: #745268;
+  --paper-stage: #223727;
+  --tape: #42643b;
+  --tape-ink: #e0fca644;
   --error: #ffb5c3;
   --shadow: 0 2px 4px #0004;
+  --dialog-shadow: #07180e70;
 }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
@@ -124,10 +131,18 @@ nav > a:hover { background: var(--secondary-hover); }
 }
 .icon-button:hover, .button.secondary:hover { background: var(--soft); }
 
-.entry-shell { margin-top: clamp(24px, 5.5vw, 62px); }
+.entry-stage { padding: clamp(32px, 5vw, 66px) 0; background: var(--paper-stage); border-bottom: 1px solid var(--line); }
 .landing-grid, .room-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.landing-grid { gap: clamp(24px, 4vw, 48px); }
 .card { min-width: 0; border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); box-shadow: var(--shadow); }
 .entry-card, .composer, .board { padding: clamp(16px, 2.6vw, 28px); }
+.entry-card { position: relative; border-radius: 10px; box-shadow: 4px 6px 0 var(--tape-ink); }
+.entry-card::before {
+  content: ""; position: absolute; width: 72px; height: 17px; top: -7px; right: clamp(12px, 5vw, 54px);
+  background: repeating-linear-gradient(115deg, transparent 0 10px, var(--tape-ink) 10px 12px), var(--tape);
+  pointer-events: none; transform: rotate(-7deg);
+}
+.entry-card:nth-child(2)::before { transform: rotate(7deg); }
 .card-heading { display: flex; align-items: center; gap: 10px; margin-bottom: 15px; }
 .card-heading p { color: var(--muted); margin-top: 2px; font-size: .88rem; }
 .tile-icon {
@@ -248,7 +263,7 @@ textarea { display: block; min-height: 132px; resize: vertical; }
 .footer { display: flex; justify-content: space-between; gap: 10px; border-top: 1px solid var(--hairline); margin-top: 25px; padding: 14px 0 22px; font-size: .82rem; color: var(--muted); }
 .footer-brand { font-size: .96rem; color: var(--ink); font-weight: 800; letter-spacing: -.05em; }
 .footer-brand span { color: var(--active); }
-dialog { position: fixed; margin: auto; width: min(510px, calc(100% - 30px)); max-height: calc(100% - 25px); padding: 22px; border: 1px solid var(--line); border-radius: 13px; color: var(--ink); background: var(--card); box-shadow: 0 12px 32px var(--hero-shadow); }
+dialog { position: fixed; margin: auto; width: min(510px, calc(100% - 30px)); max-height: calc(100% - 25px); padding: 22px; border: 1px solid var(--line); border-radius: 13px; color: var(--ink); background: var(--card); box-shadow: 0 12px 32px var(--dialog-shadow); }
 dialog::backdrop { background: #0007; }
 .dialog-close { position: absolute; right: 13px; top: 13px; }
 dialog h2 { margin-right: 40px; }

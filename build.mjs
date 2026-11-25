@@ -25,16 +25,11 @@ async function binaryAsset(path, file, mime) {
   const contents = await readFile(file);
   assets[path] = [mime, contents.toString("base64"), "base64"];
 }
-for (const width of [760, 1540]) {
-  const file = "collaborators-" + width + ".webp";
-  await binaryAsset("/" + file, new URL("./web/assets/" + file, import.meta.url), "image/webp");
-}
-for (const style of ["normal", "italic"]) {
-  const name = "instrument-serif-latin-400-" + style + ".woff2";
-  await binaryAsset("/" + name, new URL(import.meta.resolve("@fontsource/instrument-serif/files/" + name)), "font/woff2");
-}
-assets["/instrument-serif-license.txt"] = ["text/plain; charset=utf-8",
-  await readFile(new URL(import.meta.resolve("@fontsource/instrument-serif/LICENSE")), "utf8")];
+const anton = "@fontsource/anton";
+const antonFont = "anton-latin-400-normal.woff2";
+await binaryAsset("/" + antonFont, new URL(import.meta.resolve(anton + "/files/" + antonFont)), "font/woff2");
+assets["/anton-license.txt"] = ["text/plain; charset=utf-8",
+  await readFile(new URL(import.meta.resolve(anton + "/LICENSE")), "utf8")];
 assets["/qrcode.js"] = ["text/javascript; charset=utf-8",
   await readFile(new URL(import.meta.resolve("qrcode-generator")), "utf8")];
 const inter = "@fontsource-variable/inter";

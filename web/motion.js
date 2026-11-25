@@ -8,6 +8,7 @@ function updateMotion() {
   if (!stage || !button) return;
   button.hidden = reduced.matches;
   button.toggleAttribute("data-paused", paused);
+  document.documentElement.toggleAttribute("data-motion-paused", paused);
   const label = paused ? "Resume illustration animation" : "Pause illustration animation";
   button.setAttribute("aria-label", label);
   button.title = label;
