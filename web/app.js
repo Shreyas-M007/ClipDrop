@@ -819,7 +819,8 @@ document.querySelectorAll("[data-filter]").forEach(button => button.addEventList
 }));
 byId("refresh").addEventListener("click", () => loadFeed());
 byId("more").addEventListener("click", () => loadFeed({ older: true }));
-setInterval(() => { if (room && !document.hidden) loadFeed({ quiet: true }); }, 4000);
+// Auto-refresh feed every 5 s when the tab is visible; use a slight backoff on hidden tabs
+setInterval(() => { if (room && !document.hidden) loadFeed({ quiet: true }); }, 5000);
 setInterval(() => { if (posts.some(post => post.expiresAt && post.expiresAt <= Date.now())) renderFeed(); }, 1000);
 
 function fileList(parent, attachments, path, largeImages = false) {

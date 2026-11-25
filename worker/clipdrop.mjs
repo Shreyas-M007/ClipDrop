@@ -1,18 +1,23 @@
 const FILE_LIMIT = 10_000_000;
 const REQUEST_LIMIT = FILE_LIMIT + 300_000;
 const FILE_COUNT_LIMIT = 8;
+const FILE_INDEX_LIMIT = FILE_COUNT_LIMIT - 1; // max valid file index (0-based)
 const CODE_PATTERN = /^[A-Z0-9][A-Z0-9-]{2,22}[A-Z0-9]$/i;
 const COMPACT_GENERATED = /^[23456789A-HJ-NP-Z]{8}$/;
 const CODE_HELP = "Use 4–24 letters, numbers, or hyphens. Start and end with a letter or number.";
 const ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
 const EXPIRATIONS = new Set([3600, 86400, 604800]);
 const IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif", "image/avif", "image/bmp"]);
+const MEDIA_TYPES = /^(?:audio\/(?:mpeg|mp4|ogg|wav|webm|aac|flac|x-wav)|video\/(?:mp4|webm|ogg|quicktime))$/;
 const encoder = new TextEncoder();
 
 const policy = {
   "Cache-Control": "no-store",
   "Content-Security-Policy": "default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self'; media-src 'self' blob:; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'self'",
+  "Cross-Origin-Resource-Policy": "same-origin",
+  "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=()",
   "Referrer-Policy": "no-referrer",
+  "Strict-Transport-Security": "max-age=63072000; includeSubDomains; preload",
   "X-Content-Type-Options": "nosniff",
   "X-Robots-Tag": "noindex, nofollow",
 };
@@ -135,7 +140,7 @@ async function createClip(request, bucket, context) {
   const form = await readForm(request);
   if (form instanceof Response) return form;
   const content = form.get("text") ?? "";
-  if (typeof content !== "string" && content.size > 150000) {
+  if (typeof content !== "string" || content.size > 150000) {
     return error("Text can contain up to 50,000 characters.", 400);
   }
   const text = typeof content === "string" ? content : await content.text();
@@ -246,8 +251,13 @@ export function makeWorker(assets) {
       const method = request.method;
       if ((method === "GET" || method === "HEAD") && Object.hasOwn(assets, pathname)) {
         const [type, source, encoding] = assets[pathname];
+        // Security headers are inherited from `policy`; binary assets additionally get a cache directive.
+        // Critically: do NOT remove Cache-Control from policy (it's "no-store"), instead merge carefully.
         const headers = { ...policy, "Content-Type": type };
-        if (encoding === "base64") headers["Cache-Control"] = "public, max-age=86400";
+        if (encoding === "base64") {
+          // Allow browser caching for immutable binary assets (fonts, etc.) while keeping other security headers
+          headers["Cache-Control"] = "public, max-age=86400, immutable";
+        }
         if (method === "HEAD") return new Response(null, { headers });
         if (encoding !== "base64") return new Response(source, { headers });
         if (!binary.has(pathname)) binary.set(pathname, Uint8Array.from(atob(source), byte => byte.charCodeAt(0)));
@@ -263,9 +273,11 @@ export function makeWorker(assets) {
           return await handleRooms(request, env.BUCKET, url, context);
         }
         if (method === "POST" && pathname === "/api/clips") return await createClip(request, env.BUCKET, context);
-        const match = pathname.match(/^\/api\/clips\/([^/]+)(?:\/files\/(\d+))?$/);
+        const match = pathname.match(/^\/api\/clips\/([^/]+)(?:\/files\/(\d{1,2}))?$/);
         if (!match || (method !== "GET" && !(method === "DELETE" && !match[2]))) return error("Page not found.", 404);
         if (!CODE_PATTERN.test(match[1])) return error(CODE_HELP, 400);
+        const fileIdx = match[2] !== undefined ? Number(match[2]) : undefined;
+        if (fileIdx !== undefined && fileIdx > FILE_INDEX_LIMIT) return error("Attachment not found.", 404);
         const code = codeKey(match[1].toUpperCase());
         return await openClip(request, env.BUCKET, context, code, match[2], url.searchParams.has("preview"));
       } catch {

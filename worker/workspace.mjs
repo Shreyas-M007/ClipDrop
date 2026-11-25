@@ -3,7 +3,7 @@ import * as Y from "yjs";
 const WEB_PAD_LIMIT = 256 * 1024;
 const WEB_PAD_TEXT_LIMIT = 50_000;
 const WEB_PAD_STATE_LIMIT = 768 * 1024;
-const MEDIA_TYPES = /^(?:audio\/(?:mpeg|mp4|ogg|wav|webm|aac|flac|x-wav)|video\/(?:mp4|webm|ogg|quicktime))$/;
+// MEDIA_TYPES is declared in clipdrop.mjs which is concatenated before this file in the build
 
 function generation(room) {
   return room.generation || "legacy";
@@ -152,9 +152,10 @@ async function claimRoomPost(request, bucket, context, postKey, post, metadata, 
 function mediaRange(header, size) {
   const match = /^bytes=(\d*)-(\d*)$/.exec(header);
   if (!match || !size || (!match[1] && !match[2])) return null;
+  // Suffix range: bytes=-N means last N bytes. Guard against size < N producing negative start.
   const start = match[1] ? Number(match[1]) : Math.max(0, size - Number(match[2]));
   const end = match[1] && match[2] ? Math.min(size - 1, Number(match[2])) : size - 1;
-  return Number.isSafeInteger(start) && Number.isSafeInteger(end) && start <= end && start < size ? [start, end] : null;
+  return Number.isSafeInteger(start) && Number.isSafeInteger(end) && start >= 0 && start <= end && start < size ? [start, end] : null;
 }
 
 async function streamRoomMedia(request, bucket, key, post, file) {
@@ -224,7 +225,7 @@ async function handleScreen(request, bucket, context, partition, action) {
     });
   }
 
-  const input = await signalingJSON(request, 170_000);
+  const input = await signalingJSON(request, 20_000); // SDP offers/answers and ICE candidates are small; cap at 20 KB
   const { target, broadcaster } = input ?? {};
   if (!PEER_ID.test(target ?? "") || !PEER_ID.test(broadcaster ?? "") || target === id ||
       (broadcaster !== target && broadcaster !== id)) return error("Invalid screen sharing peer.", 400);

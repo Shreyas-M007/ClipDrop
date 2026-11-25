@@ -63,5 +63,7 @@ const backend = await build({
   stdin: { contents: worker.join("\n") + "\nexport default makeWorker(" + JSON.stringify(assets) + ");\n",
     resolveDir: process.cwd(), sourcefile: "clipdrop-worker.mjs" },
   bundle: true, write: false, format: "esm", minify: true, legalComments: "inline",
+  // Tree-shake dead code aggressively; the worker has no dynamic requires
+  treeShaking: true,
 });
 await writeFile(new URL("./dist/server/index.js", import.meta.url), backend.outputFiles[0].contents);
