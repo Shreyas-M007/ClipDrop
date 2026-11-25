@@ -8,7 +8,6 @@ const entries = [
   ["/style.css", "style.css", "text/css; charset=utf-8"],
   ["/app.js", "app.js", "text/javascript; charset=utf-8"],
   ["/theme.js", "theme.js", "text/javascript; charset=utf-8"],
-  ["/motion.js", "motion.js", "text/javascript; charset=utf-8"],
   ["/drop.js", "drop.js", "text/javascript; charset=utf-8"],
   ["/screens.js", "screens.js", "text/javascript; charset=utf-8"],
 ];
@@ -16,10 +15,16 @@ const assets = Object.fromEntries(await Promise.all(entries.map(async ([path, fi
   [path, [type, await readFile(new URL("./web/" + file, import.meta.url), "utf8")]],
 )));
 const landingRenderer = new URL("./dist/landing-render.mjs", import.meta.url);
-await build({ entryPoints: ["web/landing.tsx"], platform: "node", packages: "external", bundle: true,
+await build({ entryPoints: ["web/landing-render.tsx"], platform: "node", external: ["react", "react-dom"], bundle: true, loader: { ".html": "text" },
   jsx: "automatic", format: "esm", outfile: landingRenderer.pathname });
 const { renderLanding } = await import(landingRenderer.href);
-assets["/"][1] = assets["/"][1].replace("<!-- ROOM_HERO -->", renderLanding());
+assets["/"][1] = assets["/"][1].replace("<!-- TAPE_LANDING -->", () => renderLanding());
+const landingClient = await build({
+  entryPoints: ["web/landing-client.tsx"], bundle: true, write: false, minify: true,
+  jsx: "automatic", format: "esm", loader: { ".html": "text" }, legalComments: "inline",
+  define: { "process.env.NODE_ENV": '"production"' },
+});
+assets["/motion.js"] = ["text/javascript; charset=utf-8", landingClient.outputFiles[0].text];
 assets["/landing.css"] = ["text/css; charset=utf-8", await readFile(new URL("./dist/landing.css", import.meta.url), "utf8")];
 
 async function binaryAsset(path, file, mime) {
@@ -31,6 +36,11 @@ const antonFont = "anton-latin-400-normal.woff2";
 await binaryAsset("/" + antonFont, new URL(import.meta.resolve(anton + "/files/" + antonFont)), "font/woff2");
 assets["/anton-license.txt"] = ["text/plain; charset=utf-8",
   await readFile(new URL(import.meta.resolve(anton + "/LICENSE")), "utf8")];
+const kalam = "@fontsource/kalam";
+const kalamFont = "kalam-latin-700-normal.woff2";
+await binaryAsset("/" + kalamFont, new URL(import.meta.resolve(kalam + "/files/" + kalamFont)), "font/woff2");
+assets["/kalam-license.txt"] = ["text/plain; charset=utf-8",
+  await readFile(new URL(import.meta.resolve(kalam + "/LICENSE")), "utf8")];
 assets["/qrcode.js"] = ["text/javascript; charset=utf-8",
   await readFile(new URL(import.meta.resolve("qrcode-generator")), "utf8")];
 const inter = "@fontsource-variable/inter";

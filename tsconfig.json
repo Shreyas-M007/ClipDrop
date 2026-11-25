@@ -4,5 +4,5 @@
     "jsx": "react-jsx", "strict": true, "skipLibCheck": true, "noEmit": true,
     "paths": { "@/*": ["./*"] }
   },
-  "include": ["components", "lib", "web/landing.tsx"]
+  "include": ["components", "lib", "web/**/*.ts", "web/**/*.tsx"]
 }

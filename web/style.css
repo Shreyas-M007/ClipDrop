@@ -152,12 +152,6 @@ form > .button.full { margin-top: calc(2 * var(--space)); }
 }
 .entry-card, .composer, .board { padding: clamp(16px, 3vw, 32px); }
 .entry-card { position: relative; }
-.entry-card::before {
-  content: ""; position: absolute; width: 72px; height: 16px; top: -8px; right: 24px;
-  background: repeating-linear-gradient(115deg, transparent 0 10px, var(--tape-ink) 10px 12px), var(--tape);
-  pointer-events: none; transform: rotate(-7deg);
-}
-.entry-card:nth-child(2)::before { transform: rotate(7deg); }
 .card-heading { display: flex; align-items: center; gap: var(--space); margin-bottom: calc(2 * var(--space)); }
 .card-heading p { color: var(--muted); margin-top: 4px; font-size: .875rem; }
 .tile-icon.accent { background: var(--sticker-yellow); }

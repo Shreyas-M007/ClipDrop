@@ -27,51 +27,7 @@
   </div>
 </header>
 <main class="site-main">
-  <div id="home">
-    <!-- ROOM_HERO -->
-    <div class="scroll-tape" aria-hidden="true"></div>
-    <div class="entry-stage">
-      <div class="shell landing-grid">
-        <section class="card entry-card" id="create" aria-labelledby="create-title">
-          <div class="card-heading"><span class="tile-icon accent" data-icon="plus"></span><div><h2 id="create-title">Create a room</h2><p>Give your team a place to share.</p></div></div>
-          <form id="create-form">
-            <label for="room-name">Room name <span>Optional</span></label>
-            <input id="room-name" type="text" maxlength="60" placeholder="e.g. Design team" autocomplete="off">
-            <label for="room-code">Room code <span>Optional</span></label>
-            <input id="room-code" class="mono-input" type="text" maxlength="24" placeholder="e.g. DESIGN-TEAM" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-describedby="room-help">
-            <p class="field-hint" id="room-help">Choose a permanent code or leave it blank to generate one.</p>
-            <p class="message" id="create-message" role="status" hidden></p>
-            <button type="submit" class="button primary full" id="create-button"><span data-icon="plus"></span> Create room</button>
-          </form>
-        </section>
-        <section class="card entry-card" id="join" aria-labelledby="join-title">
-          <div class="card-heading"><span class="tile-icon plain" data-icon="enter"></span><div><h2 id="join-title">Join a room</h2><p>Open a room your teammate shared.</p></div></div>
-          <form id="join-form">
-            <label for="join-code">Code or share link</label>
-            <div class="with-paste"><input id="join-code" class="mono-input" type="text" placeholder="e.g. DESIGN-TEAM" autocomplete="off" autocapitalize="characters" spellcheck="false"><button type="button" id="paste-code" class="icon-button" aria-label="Paste room code" data-icon="clipboard"></button></div>
-            <p class="message" id="join-message" role="status" hidden></p>
-            <button type="submit" class="button secondary solid full" id="join-button"><span data-icon="enter"></span> Join room</button>
-          </form>
-          <section id="recent" class="recent" aria-labelledby="recent-title" hidden>
-            <div class="recent-heading">
-              <h3 id="recent-title">Recent rooms</h3>
-              <button type="button" class="btn btn-sm secondary" id="clear-recent">Clear history</button>
-            </div>
-            <ul id="recent-list"></ul>
-          </section>
-        </section>
-      </div>
-    </div>
-    <section class="shell content-types" aria-labelledby="types-title">
-      <h2 id="types-title">What you can share</h2>
-      <div class="type-grid">
-        <article class="card type-tile"><span data-icon="text"></span><h3>Text</h3><p>Notes, snippets, and ideas.</p></article>
-        <article class="card type-tile"><span data-icon="link"></span><h3>Links</h3><p>Resources and references.</p></article>
-        <article class="card type-tile"><span data-icon="image"></span><h3>Images</h3><p>Screenshots and visuals.</p></article>
-        <article class="card type-tile"><span data-icon="file"></span><h3>Files</h3><p>Documents and attachments.</p></article>
-      </div>
-    </section>
-  </div>
+  <div id="home"><!-- TAPE_LANDING --></div>
   <div id="room" class="shell room-shell" hidden>
     <div class="room-top">
       <a href="#" class="back-home">All rooms</a>
