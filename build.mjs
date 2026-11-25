@@ -4,6 +4,7 @@ import { build } from "esbuild";
 
 const entries = [
   ["/", "index.html", "text/html; charset=utf-8"],
+  ["/clipdrop-mark.svg", "clipdrop-mark.svg", "image/svg+xml"],
   ["/style.css", "style.css", "text/css; charset=utf-8"],
   ["/app.js", "app.js", "text/javascript; charset=utf-8"],
   ["/theme.js", "theme.js", "text/javascript; charset=utf-8"],

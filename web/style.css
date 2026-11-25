@@ -98,13 +98,12 @@ h3 { font-size: 1.25rem; }
   min-height: calc(var(--header-height) - var(--outline-width)); gap: var(--space);
 }
 .brand { display: inline-flex; align-items: center; gap: var(--space); text-decoration: none; line-height: 1.12; }
-.brand-mark, .tile-icon {
+.tile-icon {
   width: 40px; height: 40px; flex: none; display: grid; place-items: center;
   border: var(--outline-width) solid var(--sticker-ink); border-radius: var(--radius-sticker);
   background: var(--sticker-lime); color: var(--sticker-ink);
 }
-.brand-mark { box-shadow: var(--shadow-button) var(--sticker-ink); }
-.brand-mark svg { width: 21px; height: 21px; }
+.brand-mark { display: block; flex: none; }
 .brand-copy { display: grid; gap: 2px; }
 .brand-copy strong { font-size: 1.25rem; }
 .brand-copy span { font-size: .82rem; color: var(--muted); }
@@ -172,8 +171,9 @@ input[type="checkbox"] { accent-color: var(--ink); }
 .field-hint { color: var(--muted); font-size: .8rem; margin-top: var(--space); }
 .with-paste { display: flex; gap: var(--space); }
 .recent { border-top: var(--outline); margin-top: calc(2 * var(--space)); padding-top: var(--space); }
+.recent-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--space); }
 .recent ul { list-style: none; padding: 0; margin: var(--space) 0 0; display: grid; gap: var(--space); }
-.recent button { justify-content: space-between; width: 100%; text-align: left; }
+.recent li button { justify-content: space-between; width: 100%; text-align: left; }
 .recent button span { font-size: .75rem; }
 .content-types { margin-top: calc(4 * var(--space)); }
 .content-types > h2 { margin-bottom: calc(2 * var(--space)); }
@@ -239,7 +239,7 @@ textarea { display: block; min-height: 128px; resize: vertical; }
 
 .message { margin-top: var(--space); color: var(--error); font-size: .875rem; }
 .footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--space); border-top: var(--outline); margin-top: calc(4 * var(--space)); padding: calc(2 * var(--space)) 0 calc(3 * var(--space)); font-size: .875rem; color: var(--muted); }
-.footer-brand { font-size: 1.25rem; color: var(--ink); }
+.footer-brand { display: inline-flex; align-items: center; gap: var(--space); font-size: 1.25rem; color: var(--ink); }
 dialog { position: fixed; margin: auto; width: min(510px, calc(100% - 4 * var(--space))); max-height: calc(100% - 4 * var(--space)); padding: calc(3 * var(--space)); color: var(--ink); }
 dialog::backdrop { background: var(--backdrop); }
 .dialog-close { position: absolute; right: var(--space); top: var(--space); }

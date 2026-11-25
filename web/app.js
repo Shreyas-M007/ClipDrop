@@ -39,6 +39,7 @@ const byId = id => document.getElementById(id);
 const createForm = byId("create-form");
 const joinForm = byId("join-form");
 const joinCode = byId("join-code");
+const recentRoomsKey = "clipdrop.recentRooms";
 const joinMessage = byId("join-message");
 const postForm = byId("post-form");
 const postText = byId("post-text");
@@ -190,7 +191,7 @@ function showView(view) {
 }
 
 function renderRecent() {
-  const entries = readLocal("clipdrop.recentRooms", []);
+  const entries = readLocal(recentRoomsKey, []);
   const list = byId("recent-list");
   list.replaceChildren();
   for (const entry of entries) {
@@ -204,10 +205,26 @@ function renderRecent() {
 }
 
 function rememberRoom(entry) {
-  const recent = readLocal("clipdrop.recentRooms", []).filter(item => item.code !== entry.code);
-  writeLocal("clipdrop.recentRooms", [{ name: entry.name, code: entry.code }, ...recent].slice(0, 3));
+  const recent = readLocal(recentRoomsKey, []).filter(item => item.code !== entry.code);
+  writeLocal(recentRoomsKey, [{ name: entry.name, code: entry.code }, ...recent].slice(0, 3));
   renderRecent();
 }
+
+byId("clear-recent").addEventListener("click", () => {
+  try {
+    localStorage.removeItem(recentRoomsKey);
+  } catch {
+    notify("Could not clear recent rooms.");
+    return;
+  }
+  joinCode.focus();
+  renderRecent();
+  notify("Recent rooms cleared from this browser.");
+});
+
+window.addEventListener("storage", event => {
+  if (event.storageArea === localStorage && (event.key === recentRoomsKey || event.key === null)) renderRecent();
+});
 
 function browserToken() {
   const storageKey = "clipdrop.clientToken";

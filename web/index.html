@@ -6,6 +6,7 @@
 <meta name="description" content="Create a shared Clipdrop room for text, links, images and files. Join with a code and post without an account.">
 <meta name="referrer" content="no-referrer">
 <title>Clipdrop — Shared rooms</title>
+<link rel="icon" href="/clipdrop-mark.svg" type="image/svg+xml">
 <script src="/theme.js"></script>
 <link rel="preload" href="/inter.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/anton-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
@@ -17,7 +18,7 @@
 <body>
 <header class="header">
   <div class="shell nav">
-    <a class="brand" href="/" aria-label="Clipdrop home"><span class="brand-mark" data-icon="clipboard"></span><span class="brand-copy"><strong>Clipdrop</strong><span>Shared clipboard</span></span></a>
+    <a class="brand" href="/" aria-label="Clipdrop home"><img class="brand-mark" src="/clipdrop-mark.svg" alt="" width="44" height="44"><span class="brand-copy"><strong>Clipdrop</strong><span>Shared clipboard</span></span></a>
     <nav aria-label="Main navigation">
       <a href="#join" class="btn btn-sm" id="join-nav">Join a room</a>
       <button type="button" class="icon-button" id="fullscreen" aria-label="Enter full screen" data-icon="expand" hidden></button>
@@ -52,7 +53,10 @@
             <button type="submit" class="button secondary solid full" id="join-button"><span data-icon="enter"></span> Join room</button>
           </form>
           <section id="recent" class="recent" aria-labelledby="recent-title" hidden>
-            <h3 id="recent-title">Recent rooms</h3>
+            <div class="recent-heading">
+              <h3 id="recent-title">Recent rooms</h3>
+              <button type="button" class="btn btn-sm secondary" id="clear-recent">Clear history</button>
+            </div>
             <ul id="recent-list"></ul>
           </section>
         </section>
@@ -143,7 +147,7 @@
     <div id="old-content"></div>
   </section>
 </main>
-<footer class="shell footer"><span class="footer-brand">Clipdrop<span>.</span></span><span>Anyone with a room code can join. No account needed.</span></footer>
+<footer class="shell footer"><span class="footer-brand"><img src="/clipdrop-mark.svg" alt="" width="28" height="28">Clipdrop.</span><span>Anyone with a room code can join. No account needed.</span></footer>
 <dialog id="share-dialog" aria-labelledby="share-title">
   <form method="dialog"><button type="submit" class="icon-button dialog-close" aria-label="Close sharing" data-icon="close"></button></form>
   <h2 id="share-title">Share this room</h2><p>Scan to join, or send the code or link to your teammates.</p>
