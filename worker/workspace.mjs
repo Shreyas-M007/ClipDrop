@@ -253,3 +253,80 @@ async function handleScreen(request, bucket, context, partition, action) {
     { customMetadata: { expiresAt: String(now + 20_000) } });
   return json({});
 }
+
+const TYPE_QUEUE_TTL = 120_000;
+const TYPE_QUEUE_LIMIT = 10;
+
+async function handleTypeQueue(request, bucket, context, partition, route) {
+  const prefix = partition + "/workspace/typequeue/";
+  const now = Date.now();
+
+  if (route === "type-queue" && request.method === "GET") {
+    const page = await bucket.list({ prefix, limit: TYPE_QUEUE_LIMIT, include: ["customMetadata"] });
+    const expired = [];
+    const items = [];
+    for (const obj of page.objects) {
+      const meta = obj.customMetadata ?? {};
+      const expiresAt = Number(meta.expiresAt ?? 0);
+      if (expiresAt <= now) {
+        expired.push(obj.key);
+        continue;
+      }
+      items.push({
+        id: obj.key.slice(prefix.length),
+        expiresAt,
+        mode: meta.mode === "instant" ? "instant" : "keystroke",
+        speedMs: Number(meta.speedMs ?? 35),
+        length: Number(meta.length ?? 0),
+        preview: meta.preview ?? "",
+      });
+    }
+    if (expired.length) context.waitUntil(bucket.delete(expired).catch(() => {}));
+    return json({ items });
+  }
+
+  if (route === "type-queue" && request.method === "POST") {
+    const input = await signalingJSON(request, 65_000);
+    const text = input?.text;
+    if (typeof text !== "string" || !text.length || text.length > 50_000) {
+      return error("Enter between 1 and 50,000 characters for KeyDrop.", 400);
+    }
+    const mode = input?.mode === "instant" ? "instant" : "keystroke";
+    const rawSpeed = Number(input?.speedMs ?? 35);
+    const speedMs = Number.isFinite(rawSpeed) ? Math.min(500, Math.max(0, Math.round(rawSpeed))) : 35;
+    const id = String(9_999_999_999_999 - now).padStart(13, "0") + "-" + crypto.randomUUID();
+    const expiresAt = now + TYPE_QUEUE_TTL;
+    const preview = text.trim().replace(/\s+/g, " ").slice(0, 80) || "(whitespace)";
+    await bucket.put(prefix + id, JSON.stringify({ text, mode, speedMs }), {
+      onlyIf: { etagDoesNotMatch: "*" },
+      customMetadata: {
+        expiresAt: String(expiresAt),
+        mode,
+        speedMs: String(speedMs),
+        length: String(text.length),
+        preview,
+      },
+    });
+    return json({ id, expiresAt, mode, speedMs, length: text.length, preview }, 201);
+  }
+
+  const claimMatch = route.match(/^type-queue\/([^/]+)\/claim$/);
+  if (claimMatch && request.method === "POST") {
+    const itemKey = prefix + claimMatch[1];
+    const obj = await bucket.get(itemKey);
+    if (!obj) return error("KeyDrop item not found or already used.", 404);
+    const expiresAt = Number(obj.customMetadata?.expiresAt ?? 0);
+    context.waitUntil(bucket.delete(itemKey).catch(() => {}));
+    if (expiresAt <= now) return error("This KeyDrop item has expired.", 404);
+    const payload = await obj.json();
+    return json({ id: claimMatch[1], ...payload });
+  }
+
+  const deleteMatch = route.match(/^type-queue\/([^/]+)$/);
+  if (deleteMatch && request.method === "DELETE") {
+    await bucket.delete(prefix + deleteMatch[1]);
+    return new Response(null, { status: 204, headers: policy });
+  }
+
+  return error("Unsupported KeyDrop action.", 405);
+}

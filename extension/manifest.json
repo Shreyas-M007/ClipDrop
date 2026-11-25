@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "ClipDrop KeyDrop",
+  "version": "1.0.0",
+  "description": "Type text from a ClipDrop room into focused input fields where copy-paste is blocked.",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "ClipDrop KeyDrop"
+  },
+  "commands": {
+    "_execute_action": {
+      "suggested_key": {
+        "default": "Alt+Shift+K"
+      },
+      "description": "Open ClipDrop KeyDrop"
+    }
+  }
+}

@@ -56,6 +56,28 @@
           <div id="room-screens"></div>
           <p id="screen-message" class="message" role="status" hidden></p>
         </div>
+        <div class="room-screen" id="keydrop-panel">
+          <h2>KeyDrop — Type anywhere</h2>
+          <p class="field-hint">Queue text for another device or paste-blocked field using the ClipDrop browser extension or bookmarklet. Queued items expire in 2 minutes. Use only in compliance with the rules and terms of the systems you access.</p>
+          <label class="sr-only" for="keydrop-text">Text to type</label>
+          <textarea id="keydrop-text" maxlength="50000" placeholder="Preview or enter text to type elsewhere…"></textarea>
+          <div class="post-content-actions keydrop-controls">
+            <select id="keydrop-mode" aria-label="Typing mode">
+              <option value="keystroke">Character-by-character</option>
+              <option value="instant">Instant insert</option>
+            </select>
+            <label class="keydrop-speed-label" for="keydrop-speed">
+              <span>Delay (ms)</span>
+              <input id="keydrop-speed" type="number" min="0" max="500" value="35" aria-label="Typing delay in milliseconds">
+            </label>
+            <button class="button primary" id="keydrop-send" type="button">Send to KeyDrop</button>
+            <button class="button secondary" id="keydrop-pause" type="button" hidden>Pause</button>
+            <button class="button secondary" id="keydrop-stop" type="button" hidden>Stop</button>
+            <button class="button secondary" id="keydrop-bookmarklet" type="button">Copy bookmarklet</button>
+          </div>
+          <p id="keydrop-message" class="message" role="status" hidden></p>
+          <ul class="attachment-list" id="keydrop-queue" aria-label="Queued KeyDrop items" hidden></ul>
+        </div>
         <button class="button destructive clear-room" id="reset-room" type="button">Clear room content</button>
       </div>
     </details>

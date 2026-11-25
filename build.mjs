@@ -10,6 +10,7 @@ const entries = [
   ["/theme.js", "theme.js", "text/javascript; charset=utf-8"],
   ["/drop.js", "drop.js", "text/javascript; charset=utf-8"],
   ["/screens.js", "screens.js", "text/javascript; charset=utf-8"],
+  ["/keydrop.js", "keydrop.js", "text/javascript; charset=utf-8"],
 ];
 const assets = Object.fromEntries(await Promise.all(entries.map(async ([path, file, type]) =>
   [path, [type, await readFile(new URL("./web/" + file, import.meta.url), "utf8")]],

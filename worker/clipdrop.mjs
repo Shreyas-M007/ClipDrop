@@ -264,13 +264,36 @@ export function makeWorker(assets) {
         return new Response(binary.get(pathname), { headers });
       }
       if (!pathname.startsWith("/api/")) return error("Page not found.", 404);
-      const isMutation = method !== "GET" && method !== "HEAD";
+      const isTypeQueue = /^\/api\/rooms\/[^/]+\/type-queue(?:\/[^/]+\/claim|\/[^/]+)?$/.test(pathname);
       const requester = request.headers.get("Origin");
-      if (isMutation && requester && requester !== origin) return error("Open Clipdrop to make changes.", 403);
+      if (isTypeQueue && method === "OPTIONS") {
+        return new Response(null, {
+          status: 204,
+          headers: {
+            ...policy,
+            "Access-Control-Allow-Origin": requester || "*",
+            "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type, X-Room-Generation, X-Clipdrop-Client",
+            "Access-Control-Max-Age": "600",
+          },
+        });
+      }
+      const isMutation = method !== "GET" && method !== "HEAD";
+      const isExtensionOrigin = requester?.startsWith("chrome-extension://") || requester?.startsWith("moz-extension://");
+      if (isMutation && requester && requester !== origin && !(isTypeQueue && isExtensionOrigin) && !isTypeQueue) {
+        return error("Open Clipdrop to make changes.", 403);
+      }
       if (!env.BUCKET) return error("Shared storage is currently unavailable.", 503);
       try {
         if (pathname === "/api/rooms" || pathname.startsWith("/api/rooms/")) {
-          return await handleRooms(request, env.BUCKET, url, context);
+          const response = await handleRooms(request, env.BUCKET, url, context);
+          if (isTypeQueue && requester) {
+            const headers = new Headers(response.headers);
+            headers.set("Access-Control-Allow-Origin", requester);
+            headers.set("Vary", "Origin");
+            return new Response(response.body, { status: response.status, headers });
+          }
+          return response;
         }
         if (method === "POST" && pathname === "/api/clips") return await createClip(request, env.BUCKET, context);
         const match = pathname.match(/^\/api\/clips\/([^/]+)(?:\/files\/(\d{1,2}))?$/);

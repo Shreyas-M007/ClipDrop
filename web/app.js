@@ -376,6 +376,10 @@ function setHome() {
   nextPage = null;
   byId("posts").replaceChildren();
   byId("detail-body").replaceChildren();
+  byId("keydrop-queue").replaceChildren();
+  byId("keydrop-queue").hidden = true;
+  byId("keydrop-text").value = "";
+  message(byId("keydrop-message"));
   postForm.reset();
   files = { images: [], files: [] };
   updateComposer();
@@ -869,6 +873,7 @@ function addTextTools(body, value, detectPayload) {
   const controls = node("div", undefined, "post-content-actions");
   const payload = detectPayload(value);
   controls.append(action("Copy text", () => copy(output.textContent, "Text copied.")));
+  controls.append(action("Type anywhere", () => queueKeydrop(output.textContent), "button secondary"));
   if (payload.format === "code") controls.append(action("Download ." + payload.extension,
     () => downloadBlob(new Blob([payload.code], { type: "text/plain" }), "clip." + payload.extension)));
   if (payload.format === "json") controls.append(action("Format JSON", () => { output.textContent = payload.formatted; }));
@@ -928,8 +933,14 @@ async function openPost(entry, item) {
         const { detectPayload } = await import("/tools.js");
         if (!controller.signal.aborted) addTextTools(body, post.value, detectPayload);
       } catch {
-        if (!controller.signal.aborted) body.append(node("pre", post.value, "reader"),
-          action("Copy text", () => copy(post.value, "Text copied.")));
+        if (!controller.signal.aborted) {
+          const fallbackControls = node("div", undefined, "post-content-actions");
+          fallbackControls.append(
+            action("Copy text", () => copy(post.value, "Text copied.")),
+            action("Type anywhere", () => queueKeydrop(post.value), "button secondary"),
+          );
+          body.append(node("pre", post.value, "reader"), fallbackControls);
+        }
       }
     } else if (post.kind === "links") {
       const link = node("a", post.value, "external-link");
@@ -961,6 +972,86 @@ function renderOldClip(clip) {
   byId("old-title").focus({ preventScroll: true });
   window.scrollTo(0, 0);
 }
+
+let keydropLoader;
+function loadKeydropModule() {
+  if (!keydropLoader) keydropLoader = import("/keydrop.js").catch(error => {
+    keydropLoader = undefined;
+    throw error;
+  });
+  return keydropLoader;
+}
+
+function renderKeydropQueue(items = []) {
+  const list = byId("keydrop-queue");
+  list.replaceChildren();
+  for (const item of items) {
+    const row = node("li");
+    const label = item.preview + " (" + item.mode + ", " + item.length + " chars)";
+    const cancel = action("Cancel", async () => {
+      if (!room) return;
+      try {
+        await roomRequest(room, "type-queue/" + item.id, { method: "DELETE" });
+        loadKeydropQueue();
+      } catch (error) {
+        message(byId("keydrop-message"), error.message);
+      }
+    }, "button secondary");
+    row.append(node("span", label), cancel);
+    list.append(row);
+  }
+  list.hidden = !items.length;
+}
+
+async function loadKeydropQueue() {
+  if (!room || !byId("workspace-tools").open) return;
+  const target = room;
+  try {
+    const data = await (await roomRequest(target, "type-queue")).json();
+    if (room === target) renderKeydropQueue(data.items ?? []);
+  } catch {}
+}
+
+async function queueKeydrop(text) {
+  if (!room) return;
+  const target = room;
+  const value = typeof text === "string" ? text : byId("keydrop-text").value;
+  if (!value.length) {
+    message(byId("keydrop-message"), "Enter or select text to send to KeyDrop.");
+    return;
+  }
+  byId("keydrop-text").value = value;
+  const mode = byId("keydrop-mode").value;
+  const speedMs = Math.min(500, Math.max(0, Number(byId("keydrop-speed").value) || 0));
+  const status = byId("keydrop-message");
+  message(status);
+  try {
+    await roomRequest(target, "type-queue", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: value, mode, speedMs }),
+    });
+    if (room !== target) return;
+    byId("workspace-tools").open = true;
+    await loadKeydropQueue();
+    notify("Queued for KeyDrop (expires in 2 min). Focus target field & trigger extension or bookmarklet.");
+  } catch (error) {
+    if (room === target && error.status === 410) clearView();
+    else if (room === target) message(status, error.message);
+  }
+}
+
+byId("keydrop-send").addEventListener("click", () => queueKeydrop());
+byId("workspace-tools").addEventListener("toggle", () => { if (byId("workspace-tools").open) loadKeydropQueue(); });
+byId("keydrop-bookmarklet").addEventListener("click", async () => {
+  if (!room) return;
+  try {
+    const { buildBookmarklet } = await loadKeydropModule();
+    await copy(buildBookmarklet(location.origin, room.code), "Bookmarklet copied. Save it as a browser bookmark.");
+  } catch {
+    message(byId("keydrop-message"), "Could not build the bookmarklet.");
+  }
+});
 
 updateComposer();
 route();

@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ClipDrop KeyDrop</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <main class="panel">
+    <header class="head">
+      <strong>ClipDrop KeyDrop</strong>
+      <span class="badge">MV3</span>
+    </header>
+
+    <label class="field">
+      <span>ClipDrop URL</span>
+      <input id="server-url" type="url" placeholder="https://your-clipdrop-url.com" required>
+    </label>
+
+    <div class="row">
+      <label class="field grow">
+        <span>Room code</span>
+        <input id="room-code" type="text" placeholder="ABCD-1234" autocomplete="off" spellcheck="false" required>
+      </label>
+      <button id="refresh-btn" class="btn secondary" type="button">Fetch</button>
+    </div>
+
+    <div class="row">
+      <label class="field grow">
+        <span>Mode</span>
+        <select id="mode">
+          <option value="keystroke">Character-by-character</option>
+          <option value="instant">Instant insert</option>
+        </select>
+      </label>
+      <label class="field speed">
+        <span>Delay (ms)</span>
+        <input id="speed" type="number" min="0" max="500" value="35">
+      </label>
+    </div>
+
+    <div id="preview-box" class="preview" hidden>
+      <small id="preview-meta"></small>
+      <p id="preview-text"></p>
+    </div>
+
+    <div class="actions">
+      <button id="type-btn" class="btn primary" type="button" disabled>Type into focused field</button>
+      <button id="pause-btn" class="btn secondary" type="button" hidden>Pause</button>
+      <button id="stop-btn" class="btn secondary" type="button" hidden>Stop</button>
+    </div>
+
+    <p id="status" class="status" role="status" hidden></p>
+
+    <p class="notice">
+      Use only in compliance with the rules, policies, and terms of the systems you access.
+      Queued text expires automatically after 2 minutes.
+    </p>
+  </main>
+  <script src="popup.js"></script>
+</body>
+</html>

@@ -153,8 +153,14 @@ async function handleRooms(request, bucket, url, context) {
   if (post && !POST_ID.test(post[2])) return error("Post not found in this room.", 404);
   const workspace = route === "pad" || route === "reset";
   const screen = route === "presence" || route === "signal";
+  const typeQueue = route === "type-queue" || /^type-queue\/(\d{13}-[a-f0-9-]{36})(?:\/(claim))?$/.test(route);
+  const validTypeQueueMethod = typeQueue && (
+    (route === "type-queue" && (method === "GET" || method === "POST")) ||
+    (route.endsWith("/claim") && method === "POST") ||
+    (!route.endsWith("/claim") && route !== "type-queue" && method === "DELETE")
+  );
   const validPostMethod = post && (post[4] ? method === "POST" : method === "GET");
-  if (!workspace && !screen && !validPostMethod && !(route === "posts" && (method === "GET" || method === "POST")) &&
+  if (!workspace && !screen && !validTypeQueueMethod && !validPostMethod && !(route === "posts" && (method === "GET" || method === "POST")) &&
     !(route === "" && method === "GET")) return error("Room codes are permanent.", 405);
 
   const key = "rooms/" + codeKey(code.toUpperCase());
@@ -165,6 +171,7 @@ async function handleRooms(request, bucket, url, context) {
   if (expected && expected !== generation(room)) return error("This room was cleared. Join it again to continue.", 410);
   const partition = roomPartition(key, room);
   if (screen) return handleScreen(request, bucket, context, partition, route);
+  if (typeQueue) return handleTypeQueue(request, bucket, context, partition, route);
   if (workspace) return handleWorkspace(request, bucket, context, key, object, room, partition, route);
   if (post) return readRoomPost(request, bucket, context, partition, post[1], post[2], post[3],
     post[4] ? "claim" : searchParams.has("stream") ? "stream" : searchParams.has("preview") ? "preview" : "download");
