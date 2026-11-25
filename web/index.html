@@ -6,13 +6,14 @@
 <meta name="description" content="Create a shared Clipdrop room for text, links, images and files. Join with a code and post without an account.">
 <meta name="referrer" content="no-referrer">
 <title>Clipdrop — Shared rooms</title>
+<link rel="preload" href="/outfit.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/style.css">
 <script src="/app.js" type="module"></script>
 </head>
 <body>
 <header class="header">
   <div class="shell nav">
-    <a class="brand" href="/" aria-label="Clipdrop home"><span class="brand-mark" data-icon="clipboard"></span>Clipdrop<span class="brand-dot">.</span></a>
+    <a class="brand" href="/" aria-label="Clipdrop home"><span class="brand-mark" data-icon="clipboard"></span><span class="brand-copy"><strong>Clipdrop</strong><span>Shared clipboard</span></span></a>
     <nav aria-label="Main navigation">
       <a href="#join" id="join-nav">Join a room</a>
       <button type="button" class="icon-button" id="theme" aria-label="Switch theme" data-icon="moon"></button>
@@ -21,54 +22,55 @@
 </header>
 <main class="shell">
   <div id="home">
-    <section class="hero" aria-labelledby="home-title">
-      <div class="hero-copy">
-        <div class="hero-label"><span></span> Shared clipboard</div>
-        <h1 id="home-title">One room.<br><em>Anything to share.</em></h1>
-        <p>Drop notes, links, images, and files into one shared space. Send your teammates the room code and everyone can contribute.</p>
-      </div>
-      <div class="hero-art" aria-hidden="true">
-        <div class="art-sheet">
-          <div class="art-top"><span data-icon="grid"></span><b>ROOM BOARD</b><i></i></div>
-          <div class="art-body">
-            <div class="art-tile"><span data-icon="text"></span><div><b>Text</b><i></i></div></div>
-            <div class="art-tile"><span data-icon="link"></span><div><b>Links</b><i></i></div></div>
-            <div class="art-tile"><span data-icon="image"></span><div><b>Images</b><i></i></div></div>
-            <div class="art-tile"><span data-icon="file"></span><div><b>Files</b><i></i></div></div>
-          </div>
+    <div class="home-panel">
+      <section class="hero" aria-labelledby="home-title">
+        <div class="hero-copy">
+          <h1 id="home-title">One room.<br><em>Anything to share.</em></h1>
+          <p>Start a shared board for notes, links, images, and files. Anyone with the room code can contribute.</p>
         </div>
-        <div class="art-chip"><span data-icon="hash"></span> TEAM-NOTES</div>
-      </div>
-    </section>
-    <div class="landing-grid">
-      <section class="card entry-card" id="create" aria-labelledby="create-title">
-        <div class="card-heading"><span class="tile-icon pink" data-icon="plus"></span><div><h2 id="create-title">Create a room</h2><p>Give your team a place to share.</p></div></div>
-        <form id="create-form">
-          <label for="room-name">Room name <span>Optional</span></label>
-          <input id="room-name" type="text" maxlength="60" placeholder="e.g. Design team" autocomplete="off">
-          <label for="room-code">Room code <span>Optional</span></label>
-          <input id="room-code" class="mono-input" type="text" maxlength="24" placeholder="e.g. DESIGN-TEAM" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-describedby="room-help">
-          <p class="field-hint" id="room-help">Choose a permanent code or leave it blank to generate one.</p>
-          <p class="message" id="create-message" role="status" hidden></p>
-          <button type="submit" class="button yellow full" id="create-button"><span data-icon="plus"></span> Create room</button>
-        </form>
+        <div class="hero-art" aria-hidden="true">
+          <div class="art-sheet">
+            <div class="art-top"><span data-icon="grid"></span><b>ROOM BOARD</b><i></i></div>
+            <div class="art-body">
+              <div class="art-tile"><span data-icon="text"></span><div><b>Text</b><i></i></div></div>
+              <div class="art-tile"><span data-icon="link"></span><div><b>Links</b><i></i></div></div>
+              <div class="art-tile"><span data-icon="image"></span><div><b>Images</b><i></i></div></div>
+              <div class="art-tile"><span data-icon="file"></span><div><b>Files</b><i></i></div></div>
+            </div>
+          </div>
+          <div class="art-chip"><span data-icon="hash"></span> TEAM-NOTES</div>
+        </div>
       </section>
-      <section class="card entry-card" id="join" aria-labelledby="join-title">
-        <div class="card-heading"><span class="tile-icon plain" data-icon="enter"></span><div><h2 id="join-title">Join a room</h2><p>Open a room your teammate shared.</p></div></div>
-        <form id="join-form">
-          <label for="join-code">Code or share link</label>
-          <div class="with-paste"><input id="join-code" class="mono-input" type="text" placeholder="e.g. DESIGN-TEAM" autocomplete="off" autocapitalize="characters" spellcheck="false"><button type="button" id="paste-code" aria-label="Paste room code" data-icon="clipboard"></button></div>
-          <p class="message" id="join-message" role="status" hidden></p>
-          <button type="submit" class="button black full" id="join-button"><span data-icon="enter"></span> Join room</button>
-        </form>
-        <section id="recent" class="recent" aria-labelledby="recent-title" hidden>
-          <h3 id="recent-title">Recent rooms</h3>
-          <ul id="recent-list"></ul>
+      <div class="landing-grid">
+        <section class="card entry-card" id="create" aria-labelledby="create-title">
+          <div class="card-heading"><span class="tile-icon pink" data-icon="plus"></span><div><h2 id="create-title">Create a room</h2><p>Give your team a place to share.</p></div></div>
+          <form id="create-form">
+            <label for="room-name">Room name <span>Optional</span></label>
+            <input id="room-name" type="text" maxlength="60" placeholder="e.g. Design team" autocomplete="off">
+            <label for="room-code">Room code <span>Optional</span></label>
+            <input id="room-code" class="mono-input" type="text" maxlength="24" placeholder="e.g. DESIGN-TEAM" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-describedby="room-help">
+            <p class="field-hint" id="room-help">Choose a permanent code or leave it blank to generate one.</p>
+            <p class="message" id="create-message" role="status" hidden></p>
+            <button type="submit" class="button primary full" id="create-button"><span data-icon="plus"></span> Create room</button>
+          </form>
         </section>
-      </section>
+        <section class="card entry-card" id="join" aria-labelledby="join-title">
+          <div class="card-heading"><span class="tile-icon plain" data-icon="enter"></span><div><h2 id="join-title">Join a room</h2><p>Open a room your teammate shared.</p></div></div>
+          <form id="join-form">
+            <label for="join-code">Code or share link</label>
+            <div class="with-paste"><input id="join-code" class="mono-input" type="text" placeholder="e.g. DESIGN-TEAM" autocomplete="off" autocapitalize="characters" spellcheck="false"><button type="button" id="paste-code" aria-label="Paste room code" data-icon="clipboard"></button></div>
+            <p class="message" id="join-message" role="status" hidden></p>
+            <button type="submit" class="button secondary solid full" id="join-button"><span data-icon="enter"></span> Join room</button>
+          </form>
+          <section id="recent" class="recent" aria-labelledby="recent-title" hidden>
+            <h3 id="recent-title">Recent rooms</h3>
+            <ul id="recent-list"></ul>
+          </section>
+        </section>
+      </div>
     </div>
     <section class="content-types" aria-labelledby="types-title">
-      <h2 id="types-title">Everything has a place</h2>
+      <h2 id="types-title">What you can share</h2>
       <div class="type-grid">
         <article class="card type-tile"><span data-icon="text"></span><h3>Text</h3><p>Notes, snippets, and ideas.</p></article>
         <article class="card type-tile"><span data-icon="link"></span><h3>Links</h3><p>Resources and references.</p></article>
@@ -105,7 +107,7 @@
             <ul class="attachment-list" id="selected-files" aria-label="Selected attachments" hidden></ul>
           </div>
           <p class="message" id="post-message" role="status" hidden></p>
-          <button type="submit" class="button yellow full" id="post-button"><span data-icon="plus"></span> Post to room</button>
+          <button type="submit" class="button primary full" id="post-button"><span data-icon="plus"></span> Post to room</button>
         </form>
       </section>
       <section class="card board" aria-labelledby="board-title">

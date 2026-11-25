@@ -11,7 +11,7 @@ const encoder = new TextEncoder();
 
 const policy = {
   "Cache-Control": "no-store",
-  "Content-Security-Policy": "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'self'",
+  "Content-Security-Policy": "default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'self'",
   "Referrer-Policy": "no-referrer",
   "X-Content-Type-Options": "nosniff",
   "X-Robots-Tag": "noindex, nofollow",
@@ -244,8 +244,10 @@ export function makeWorker(assets) {
       const { pathname, origin } = url;
       const method = request.method;
       if ((method === "GET" || method === "HEAD") && Object.hasOwn(assets, pathname)) {
-        const [type, body] = assets[pathname];
-        return new Response(method === "HEAD" ? null : body, { headers: { ...policy, "Content-Type": type } });
+        const [type, source, encoding] = assets[pathname];
+        const body = method === "HEAD" ? null : encoding === "base64" ?
+          Uint8Array.from(atob(source), byte => byte.charCodeAt(0)) : source;
+        return new Response(body, { headers: { ...policy, "Content-Type": type } });
       }
       if (!pathname.startsWith("/api/")) return error("Page not found.", 404);
       const isMutation = method !== "GET" && method !== "HEAD";

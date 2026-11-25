@@ -1,1 +1,1 @@
-{"private":true,"type":"module","scripts":{"build":"node build.mjs"},"dependencies":{"qrcode-generator":"2.0.4"}}
+{"private":true,"type":"module","scripts":{"build":"node build.mjs"},"dependencies":{"@fontsource-variable/outfit":"5.3.0","qrcode-generator":"2.0.4"}}

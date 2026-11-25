@@ -370,7 +370,7 @@ byId("share-room").addEventListener("click", () => {
   byId("share-code").textContent = code;
   const actions = byId("share-actions");
   actions.replaceChildren(
-    action("Copy invitation", () => copy(invite, "Invitation copied."), "button yellow"),
+    action("Copy invitation", () => copy(invite, "Invitation copied."), "button primary"),
     action("Copy link", () => copy(url, "Link copied.")),
     action("Copy code", () => copy(code, "Room code copied.")),
   );
