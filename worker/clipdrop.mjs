@@ -238,6 +238,7 @@ async function serveAttachment(bucket, key, metadataSize, file, preview, onlyIf)
 }
 
 export function makeWorker(assets) {
+  const binary = new Map();
   return {
     async fetch(request, env, context) {
       const url = new URL(request.url);
@@ -245,9 +246,12 @@ export function makeWorker(assets) {
       const method = request.method;
       if ((method === "GET" || method === "HEAD") && Object.hasOwn(assets, pathname)) {
         const [type, source, encoding] = assets[pathname];
-        const body = method === "HEAD" ? null : encoding === "base64" ?
-          Uint8Array.from(atob(source), byte => byte.charCodeAt(0)) : source;
-        return new Response(body, { headers: { ...policy, "Content-Type": type } });
+        const headers = { ...policy, "Content-Type": type };
+        if (encoding === "base64") headers["Cache-Control"] = "public, max-age=86400";
+        if (method === "HEAD") return new Response(null, { headers });
+        if (encoding !== "base64") return new Response(source, { headers });
+        if (!binary.has(pathname)) binary.set(pathname, Uint8Array.from(atob(source), byte => byte.charCodeAt(0)));
+        return new Response(binary.get(pathname), { headers });
       }
       if (!pathname.startsWith("/api/")) return error("Page not found.", 404);
       const isMutation = method !== "GET" && method !== "HEAD";

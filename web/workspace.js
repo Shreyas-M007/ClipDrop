@@ -1,4 +1,4 @@
-import { Y } from "/tools.js";
+import * as Y from "yjs";
 import { createScreens } from "/screens.js";
 
 export function createScratchpad({ textarea, status, request, cleared }) {

@@ -6,16 +6,35 @@ const entries = [
   ["/", "index.html", "text/html; charset=utf-8"],
   ["/style.css", "style.css", "text/css; charset=utf-8"],
   ["/app.js", "app.js", "text/javascript; charset=utf-8"],
-  ["/workspace.js", "workspace.js", "text/javascript; charset=utf-8"],
+  ["/theme.js", "theme.js", "text/javascript; charset=utf-8"],
+  ["/motion.js", "motion.js", "text/javascript; charset=utf-8"],
+  ["/drop.js", "drop.js", "text/javascript; charset=utf-8"],
   ["/screens.js", "screens.js", "text/javascript; charset=utf-8"],
 ];
 const assets = Object.fromEntries(await Promise.all(entries.map(async ([path, file, type]) =>
   [path, [type, await readFile(new URL("./web/" + file, import.meta.url), "utf8")]],
 )));
-const landing = await build({ entryPoints: ["web/landing.tsx"], bundle: true, write: false, minify: true,
-  jsx: "automatic", define: { "process.env.NODE_ENV": '"production"' }, legalComments: "inline" });
-assets["/landing.js"] = ["text/javascript; charset=utf-8", landing.outputFiles[0].text];
+const landingRenderer = new URL("./dist/landing-render.mjs", import.meta.url);
+await build({ entryPoints: ["web/landing.tsx"], platform: "node", packages: "external", bundle: true,
+  jsx: "automatic", format: "esm", outfile: landingRenderer.pathname });
+const { renderLanding } = await import(landingRenderer.href);
+assets["/"][1] = assets["/"][1].replace("<!-- ROOM_HERO -->", renderLanding());
 assets["/landing.css"] = ["text/css; charset=utf-8", await readFile(new URL("./dist/landing.css", import.meta.url), "utf8")];
+
+async function binaryAsset(path, file, mime) {
+  const contents = await readFile(file);
+  assets[path] = [mime, contents.toString("base64"), "base64"];
+}
+for (const width of [760, 1540]) {
+  const file = "collaborators-" + width + ".webp";
+  await binaryAsset("/" + file, new URL("./web/assets/" + file, import.meta.url), "image/webp");
+}
+for (const style of ["normal", "italic"]) {
+  const name = "instrument-serif-latin-400-" + style + ".woff2";
+  await binaryAsset("/" + name, new URL(import.meta.resolve("@fontsource/instrument-serif/files/" + name)), "font/woff2");
+}
+assets["/instrument-serif-license.txt"] = ["text/plain; charset=utf-8",
+  await readFile(new URL(import.meta.resolve("@fontsource/instrument-serif/LICENSE")), "utf8")];
 assets["/qrcode.js"] = ["text/javascript; charset=utf-8",
   await readFile(new URL(import.meta.resolve("qrcode-generator")), "utf8")];
 const inter = "@fontsource-variable/inter";
@@ -26,6 +45,10 @@ assets["/inter-license.txt"] = ["text/plain; charset=utf-8",
 const tools = await build({ entryPoints: ["web/tools.js"], bundle: true, write: false, minify: true,
   format: "esm", legalComments: "inline" });
 assets["/tools.js"] = ["text/javascript; charset=utf-8", tools.outputFiles[0].text];
+const workspace = await build({ entryPoints: ["web/workspace.js"], external: ["/screens.js"], bundle: true,
+  write: false, minify: true, format: "esm", legalComments: "inline" });
+assets["/workspace.js"] = ["text/javascript; charset=utf-8", workspace.outputFiles[0].text];
+
 const worker = await Promise.all(["clipdrop.mjs", "rooms.mjs", "workspace.mjs"].map(file =>
   readFile(new URL("./worker/" + file, import.meta.url), "utf8"),
 ));

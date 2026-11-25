@@ -1,6 +1,4 @@
-import qrcode from "/qrcode.js";
-import { detectPayload, directoryFiles, readDrop, zipFolder } from "/tools.js";
-import { createScratchpad, createHostedScreens } from "/workspace.js";
+import { directoryFiles, readDrop } from "/drop.js";
 
 
 const icons = {
@@ -25,6 +23,8 @@ const icons = {
   sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l2 2m10 10 2 2m0-14-2 2M7 17l-2 2"/>',
   moon: '<path d="M20.8 14A9 9 0 0 1 10 3.2 9 9 0 1 0 20.8 14Z"/>',
   file: '<path d="M6 3h8l4 4v14H6zM14 3v5h4M9 13h6m-6 4h6"/>',
+  expand: '<path d="M4 9V4h5m6 0h5v5m0 6v5h-5m-6 0H4v-5"/>',
+  collapse: '<path d="M9 4v5H4m16 0h-5V4m0 16v-5h5m-16 0h5v5"/>',
   close: '<path d="m6 6 12 12M18 6 6 18"/>',
 };
 
@@ -97,12 +97,40 @@ function applyTheme(theme) {
   button.setAttribute("aria-label", theme === "dark" ? "Switch to light theme" : "Switch to dark theme");
 }
 
-applyTheme(readLocal("clipdrop.theme", "light"));
+const scheme = matchMedia("(prefers-color-scheme: dark)");
+applyTheme(document.documentElement.dataset.theme ?? (scheme.matches ? "dark" : "light"));
+scheme.addEventListener("change", event => {
+  const saved = readLocal("clipdrop.theme", null);
+  if (saved !== "dark" && saved !== "light") applyTheme(event.matches ? "dark" : "light");
+});
 byId("theme").addEventListener("click", () => {
   const theme = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
   applyTheme(theme);
   writeLocal("clipdrop.theme", theme);
 });
+
+const fullScreen = byId("fullscreen");
+if (document.fullscreenEnabled && document.documentElement.requestFullscreen) {
+  fullScreen.hidden = false;
+  function updateFullScreen() {
+    const on = Boolean(document.fullscreenElement);
+    icon(fullScreen, on ? "collapse" : "expand");
+    const label = on ? "Exit full screen" : "Enter full screen";
+    fullScreen.setAttribute("aria-label", label);
+    fullScreen.title = label;
+  }
+
+  document.addEventListener("fullscreenchange", updateFullScreen);
+  fullScreen.addEventListener("click", async () => {
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else await document.documentElement.requestFullscreen();
+    } catch {
+      notify("Full screen is unavailable in this window.");
+    }
+  });
+  updateFullScreen();
+}
 
 function notify(text) {
   clearTimeout(toastTimeout);
@@ -219,44 +247,71 @@ function clearView() {
   message(joinMessage, "This room was cleared. Use its code to join again.");
 }
 
-const scratchpad = createScratchpad({
-  textarea: byId("scratchpad"), status: text => message(byId("scratch-message"), text),
-  request: roomRequest, cleared: clearView,
-});
-setInterval(() => scratchpad.tick(), 2200);
-const videos = byId("room-screens");
-const screens = createHostedScreens({
-  controls: byId("workspace-tools"), request: roomRequest,
-  warning: text => message(byId("screen-message"), text), cleared: clearView,
-  draw({ local, incoming }) {
-    const streams = new Map(incoming.map(({ peerId, stream }) => [peerId, stream]));
-    if (local) streams.set("local", local);
-    for (const player of [...videos.children]) {
-      if (!streams.has(player.dataset.id) || streams.get(player.dataset.id) !== player.srcObject) {
-        player.srcObject = null;
-        player.remove();
-      } else streams.delete(player.dataset.id);
+let workspaceControls;
+let workspaceLoader;
+
+function setupWorkspace() {
+  if (!workspaceLoader) workspaceLoader = import("/workspace.js").then(({ createScratchpad, createHostedScreens }) => {
+    const scratchpad = createScratchpad({
+      textarea: byId("scratchpad"), status: text => message(byId("scratch-message"), text),
+      request: roomRequest, cleared: clearView,
+    });
+    setInterval(() => scratchpad.tick(), 2200);
+    const videos = byId("room-screens");
+    const screens = createHostedScreens({
+      controls: byId("workspace-tools"), request: roomRequest,
+      warning: text => message(byId("screen-message"), text), cleared: clearView,
+      draw({ local, incoming }) {
+        const streams = new Map(incoming.map(({ peerId, stream }) => [peerId, stream]));
+        if (local) streams.set("local", local);
+        for (const player of [...videos.children]) {
+          if (!streams.has(player.dataset.id) || streams.get(player.dataset.id) !== player.srcObject) {
+            player.srcObject = null;
+            player.remove();
+          } else streams.delete(player.dataset.id);
+        }
+        for (const [id, stream] of streams) {
+          const player = node("video", undefined, "room-media");
+          player.dataset.id = id;
+          player.srcObject = stream;
+          player.autoplay = player.playsInline = player.controls = true;
+          player.muted = id === "local";
+          player.setAttribute("aria-label", id === "local" ? "Your screen" : "Shared screen");
+          videos.append(player);
+        }
+        byId("start-room-screen").hidden = Boolean(local);
+        byId("stop-room-screen").hidden = !local;
+      },
+    });
+    setInterval(() => screens.tick(), 2250);
+    byId("workspace-tools").addEventListener("toggle", () => screens.tick());
+    for (const [id, run] of [["start-room-screen", screens.startScreen], ["stop-room-screen", screens.stopScreen]]) {
+      byId(id).addEventListener("click", async () => {
+        message(byId("screen-message"));
+        try { await run(); } catch (error) { message(byId("screen-message"), error.message); }
+      });
     }
-    for (const [id, stream] of streams) {
-      const player = node("video", undefined, "room-media");
-      player.dataset.id = id;
-      player.srcObject = stream;
-      player.autoplay = player.playsInline = player.controls = true;
-      player.muted = id === "local";
-      player.setAttribute("aria-label", id === "local" ? "Your screen" : "Shared screen");
-      videos.append(player);
-    }
-    byId("start-room-screen").hidden = Boolean(local);
-    byId("stop-room-screen").hidden = !local;
-  },
-});
-setInterval(() => screens.tick(), 2250);
-byId("workspace-tools").addEventListener("toggle", () => screens.tick());
-for (const [id, run] of [["start-room-screen", screens.startScreen], ["stop-room-screen", screens.stopScreen]]) {
-  byId(id).addEventListener("click", async () => {
-    message(byId("screen-message"));
-    try { await run(); } catch (error) { message(byId("screen-message"), error.message); }
+    return workspaceControls = { scratchpad, screens };
+  }).catch(error => {
+    workspaceLoader = undefined;
+    throw error;
   });
+  return workspaceLoader;
+}
+
+function startWorkspace(entry) {
+  setupWorkspace().then(({ scratchpad, screens }) => {
+    if (room !== entry) return;
+    scratchpad.start(entry);
+    screens.enter(entry);
+  }).catch(() => {
+    if (room === entry) message(byId("scratch-message"), "Could not load the room tools. Refresh the page to try again.");
+  });
+}
+
+function stopWorkspace() {
+  workspaceControls?.scratchpad.stop();
+  workspaceControls?.screens.stop();
 }
 
 byId("reset-room").addEventListener("click", async () => {
@@ -288,8 +343,7 @@ function showRoom(entry) {
   document.title = room.name + " · Clipdrop";
   rememberRoom(room);
   showView("room");
-  scratchpad.start(entry);
-  screens.enter(entry);
+  startWorkspace(entry);
   setFilter("all");
   byId("room-title").focus({ preventScroll: true });
   window.scrollTo(0, 0);
@@ -300,8 +354,7 @@ function setHome() {
   postLookup?.abort();
   feedRequest?.abort();
   room = null;
-  scratchpad.stop();
-  screens.stop();
+  stopWorkspace();
   posts = [];
   nextPage = null;
   byId("posts").replaceChildren();
@@ -449,7 +502,7 @@ createForm.addEventListener("submit", async event => {
   }
 });
 
-function drawQR(canvas, value) {
+function drawQR(canvas, value, qrcode) {
   const qr = qrcode(0, "M");
   qr.addData(value);
   qr.make();
@@ -468,11 +521,17 @@ function drawQR(canvas, value) {
   }
 }
 
-byId("share-room").addEventListener("click", () => {
-  const { code, name } = room;
+byId("share-room").addEventListener("click", async () => {
+  const entry = room;
+  if (!entry || shareDialog.open) return;
+  let qrcode;
+  try { ({ default: qrcode } = await import("/qrcode.js")); }
+  catch { return notify("Could not load the room QR code. Try again."); }
+  if (room !== entry || shareDialog.open) return;
+  const { code, name } = entry;
   const url = shareURL("room", code);
   const invite = "Join " + name + " on Clipdrop\n" + url + "\nRoom code: " + code;
-  drawQR(byId("share-qr"), url);
+  drawQR(byId("share-qr"), url, qrcode);
   byId("share-code").textContent = code;
   const actions = byId("share-actions");
   actions.replaceChildren(
@@ -564,6 +623,7 @@ async function addFolder(entries) {
   const status = byId("post-message");
   const root = entries[0].path.split("/")[0];
   message(status, "Compressing folder…");
+  const { zipFolder } = await import("/tools.js");
   const archive = await zipFolder(entries, 10_000_000, root + ".zip");
   if (room !== target) return;
   formats.find(input => input.value === "files").checked = true;
@@ -786,7 +846,7 @@ function downloadBlob(blob, name) {
   setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
 
-function addTextTools(body, value) {
+function addTextTools(body, value, detectPayload) {
   const output = node("pre", value, "reader");
   const controls = node("div", undefined, "post-content-actions");
   const payload = detectPayload(value);
@@ -846,7 +906,13 @@ async function openPost(entry, item) {
     if (controller.signal.aborted) return;
     body.replaceChildren(node("p", dateFormat.format(new Date(post.createdAt))));
     if (post.kind === "text") {
-      addTextTools(body, post.value);
+      try {
+        const { detectPayload } = await import("/tools.js");
+        if (!controller.signal.aborted) addTextTools(body, post.value, detectPayload);
+      } catch {
+        if (!controller.signal.aborted) body.append(node("pre", post.value, "reader"),
+          action("Copy text", () => copy(post.value, "Text copied.")));
+      }
     } else if (post.kind === "links") {
       const link = node("a", post.value, "external-link");
       link.href = post.value;
@@ -866,8 +932,7 @@ postDialog.addEventListener("close", () => {
 
 function renderOldClip(clip) {
   room = null;
-  scratchpad.stop();
-  screens.stop();
+  stopWorkspace();
   feedRequest?.abort();
   showView("clip");
   const target = byId("old-content");

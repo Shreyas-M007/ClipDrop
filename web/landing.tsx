@@ -1,5 +1,6 @@
-import { createRoot } from "react-dom/client";
-import { GoRide } from "@/components/ui/goride";
+import { renderToStaticMarkup } from "react-dom/server";
+import { RoomHero } from "@/components/ui/room-hero";
 
-const target = document.getElementById("launch");
-if (target) createRoot(target).render(<GoRide />);
+export function renderLanding() {
+  return renderToStaticMarkup(<RoomHero />);
+}
