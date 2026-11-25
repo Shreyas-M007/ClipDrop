@@ -10,8 +10,6 @@ const entries = [
   ["/app.js", "app.js", "text/javascript; charset=utf-8"],
   ["/theme.js", "theme.js", "text/javascript; charset=utf-8"],
   ["/drop.js", "drop.js", "text/javascript; charset=utf-8"],
-  ["/screens.js", "screens.js", "text/javascript; charset=utf-8"],
-  ["/keydrop.js", "keydrop.js", "text/javascript; charset=utf-8"],
 ];
 const assets = Object.fromEntries(await Promise.all(entries.map(async ([path, file, type]) =>
   [path, [type, await readFile(new URL("./web/" + file, import.meta.url), "utf8")]],
@@ -53,9 +51,9 @@ assets["/inter-license.txt"] = ["text/plain; charset=utf-8",
 const tools = await build({ entryPoints: ["web/tools.js"], bundle: true, write: false, minify: true,
   format: "esm", legalComments: "inline" });
 assets["/tools.js"] = ["text/javascript; charset=utf-8", tools.outputFiles[0].text];
-const workspace = await build({ entryPoints: ["web/workspace.js"], external: ["/screens.js"], bundle: true,
-  write: false, minify: true, format: "esm", legalComments: "inline" });
-assets["/workspace.js"] = ["text/javascript; charset=utf-8", workspace.outputFiles[0].text];
+const convert = await build({ entryPoints: ["web/convert.js"], bundle: true, write: false, minify: true,
+  format: "esm", legalComments: "inline" });
+assets["/convert.js"] = ["text/javascript; charset=utf-8", convert.outputFiles[0].text];
 
 const worker = await Promise.all(["clipdrop.mjs", "rooms.mjs", "workspace.mjs"].map(file =>
   readFile(new URL("./worker/" + file, import.meta.url), "utf8"),

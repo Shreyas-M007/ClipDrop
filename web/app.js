@@ -257,92 +257,6 @@ async function roomRequest(target, resource, options = {}) {
   return response;
 }
 
-function clearView() {
-  if (!room) return;
-  history.replaceState(null, "", "/");
-  setHome();
-  message(joinMessage, "This room was cleared. Use its code to join again.");
-}
-
-let workspaceControls;
-let workspaceLoader;
-
-function setupWorkspace() {
-  if (!workspaceLoader) workspaceLoader = import("/workspace.js").then(({ createScratchpad, createHostedScreens }) => {
-    const scratchpad = createScratchpad({
-      textarea: byId("scratchpad"), status: text => message(byId("scratch-message"), text),
-      request: roomRequest, cleared: clearView,
-    });
-    setInterval(() => scratchpad.tick(), 2200);
-    const videos = byId("room-screens");
-    const screens = createHostedScreens({
-      controls: byId("workspace-tools"), request: roomRequest,
-      warning: text => message(byId("screen-message"), text), cleared: clearView,
-      draw({ local, incoming }) {
-        const streams = new Map(incoming.map(({ peerId, stream }) => [peerId, stream]));
-        if (local) streams.set("local", local);
-        for (const player of [...videos.children]) {
-          if (!streams.has(player.dataset.id) || streams.get(player.dataset.id) !== player.srcObject) {
-            player.srcObject = null;
-            player.remove();
-          } else streams.delete(player.dataset.id);
-        }
-        for (const [id, stream] of streams) {
-          const player = node("video", undefined, "room-media");
-          player.dataset.id = id;
-          player.srcObject = stream;
-          player.autoplay = player.playsInline = player.controls = true;
-          player.muted = id === "local";
-          player.setAttribute("aria-label", id === "local" ? "Your screen" : "Shared screen");
-          videos.append(player);
-        }
-        byId("start-room-screen").hidden = Boolean(local);
-        byId("stop-room-screen").hidden = !local;
-      },
-    });
-    setInterval(() => screens.tick(), 2250);
-    byId("workspace-tools").addEventListener("toggle", () => screens.tick());
-    for (const [id, run] of [["start-room-screen", screens.startScreen], ["stop-room-screen", screens.stopScreen]]) {
-      byId(id).addEventListener("click", async () => {
-        message(byId("screen-message"));
-        try { await run(); } catch (error) { message(byId("screen-message"), error.message); }
-      });
-    }
-    return workspaceControls = { scratchpad, screens };
-  }).catch(error => {
-    workspaceLoader = undefined;
-    throw error;
-  });
-  return workspaceLoader;
-}
-
-function startWorkspace(entry) {
-  setupWorkspace().then(({ scratchpad, screens }) => {
-    if (room !== entry) return;
-    scratchpad.start(entry);
-    screens.enter(entry);
-  }).catch(() => {
-    if (room === entry) message(byId("scratch-message"), "Could not load the room tools. Refresh the page to try again.");
-  });
-}
-
-function stopWorkspace() {
-  workspaceControls?.scratchpad.stop();
-  workspaceControls?.screens.stop();
-}
-
-byId("reset-room").addEventListener("click", async () => {
-  if (!room || !confirm("Clear this room’s posts and scratchpad for everyone? The room code will still work.")) return;
-  const target = room;
-  try {
-    await roomRequest(target, "reset", { method: "POST" });
-    if (room === target) clearView();
-  } catch (error) {
-    if (error.status === 410 && room === target) clearView();
-    else message(byId("scratch-message"), error.message);
-  }
-});
-
 function showRoom(entry) {
   const different = room?.code !== entry.code;
   activeFilter = "all";
@@ -360,7 +274,6 @@ function showRoom(entry) {
   document.title = room.name + " · Clipdrop";
   rememberRoom(room);
   showView("room");
-  startWorkspace(entry);
   setFilter("all");
   byId("room-title").focus({ preventScroll: true });
   window.scrollTo(0, 0);
@@ -371,15 +284,10 @@ function setHome() {
   postLookup?.abort();
   feedRequest?.abort();
   room = null;
-  stopWorkspace();
   posts = [];
   nextPage = null;
   byId("posts").replaceChildren();
   byId("detail-body").replaceChildren();
-  byId("keydrop-queue").replaceChildren();
-  byId("keydrop-queue").hidden = true;
-  byId("keydrop-text").value = "";
-  message(byId("keydrop-message"));
   postForm.reset();
   files = { images: [], files: [] };
   updateComposer();
@@ -712,7 +620,7 @@ postForm.addEventListener("submit", async event => {
     else loadFeed();
     notify("Posted to the room.");
   } catch (error) {
-    if (room === target && error.status === 410) clearView();
+    if (room === target && error.status === 410) setHome();
     else if (room === target) message(status, error.message);
   } finally {
     controls.forEach(control => { control.disabled = false; });
@@ -795,7 +703,7 @@ async function loadFeed({ older = false, quiet = false } = {}) {
     message(byId("board-message"));
     renderFeed();
   } catch (error) {
-    if (!request.signal.aborted && error.status === 410 && room === target) clearView();
+    if (!request.signal.aborted && error.status === 410 && room === target) setHome();
     else if (!request.signal.aborted && !quiet) message(byId("board-message"), error.message);
   } finally {
     if (feedRequest === request) {
@@ -827,6 +735,15 @@ byId("more").addEventListener("click", () => loadFeed({ older: true }));
 setInterval(() => { if (room && !document.hidden) loadFeed({ quiet: true }); }, 5000);
 setInterval(() => { if (posts.some(post => post.expiresAt && post.expiresAt <= Date.now())) renderFeed(); }, 1000);
 
+let convertLoader;
+function loadConvertModule() {
+  if (!convertLoader) convertLoader = import("/convert.js").catch(error => {
+    convertLoader = undefined;
+    throw error;
+  });
+  return convertLoader;
+}
+
 function fileList(parent, attachments, path, largeImages = false) {
   const list = node("ul", undefined, "attachment-list");
   attachments.forEach((file, index) => {
@@ -853,7 +770,40 @@ function fileList(parent, attachments, path, largeImages = false) {
     download.href = resource;
     download.download = file.name;
     download.setAttribute("aria-label", "Download " + file.name);
-    row.append(node("span", file.name), download);
+    const convertBox = node("div", undefined, "convert-controls");
+    loadConvertModule().then(({ getConversionTargets, convertBlob }) => {
+      const targets = getConversionTargets(file);
+      if (!targets.length) return;
+      const select = node("select");
+      select.setAttribute("aria-label", "Convert " + file.name + " to");
+      for (const t of targets) {
+        const opt = node("option", t.label);
+        opt.value = t.id;
+        select.append(opt);
+      }
+      const btn = action("Convert", async () => {
+        btn.disabled = true;
+        select.disabled = true;
+        const prevLabel = btn.textContent;
+        btn.textContent = "Converting…";
+        try {
+          const response = await fetch(resource);
+          if (!response.ok) throw new Error("Could not fetch file.");
+          const blob = await response.blob();
+          const result = await convertBlob(blob, file, select.value);
+          downloadBlob(result.blob, result.filename);
+          notify("Converted to " + result.filename);
+        } catch (error) {
+          notify(error.message || "Could not convert this file.");
+        } finally {
+          btn.disabled = false;
+          select.disabled = false;
+          btn.textContent = prevLabel;
+        }
+      }, "button secondary");
+      convertBox.append(select, btn);
+    }).catch(() => {});
+    row.append(node("span", file.name), convertBox, download);
     list.append(row);
   });
   parent.append(list);
@@ -873,7 +823,6 @@ function addTextTools(body, value, detectPayload) {
   const controls = node("div", undefined, "post-content-actions");
   const payload = detectPayload(value);
   controls.append(action("Copy text", () => copy(output.textContent, "Text copied.")));
-  controls.append(action("Type anywhere", () => queueKeydrop(output.textContent), "button secondary"));
   if (payload.format === "code") controls.append(action("Download ." + payload.extension,
     () => downloadBlob(new Blob([payload.code], { type: "text/plain" }), "clip." + payload.extension)));
   if (payload.format === "json") controls.append(action("Format JSON", () => { output.textContent = payload.formatted; }));
@@ -906,7 +855,7 @@ function renderClaim(entry, item, container) {
         }, 15000);
       }
     } catch (error) {
-      if (room === entry && error.status === 410) clearView();
+      if (room === entry && error.status === 410) setHome();
       else if (room === entry) container.replaceChildren(node("p", error.message, "message"));
     }
   }, "button primary");
@@ -933,14 +882,8 @@ async function openPost(entry, item) {
         const { detectPayload } = await import("/tools.js");
         if (!controller.signal.aborted) addTextTools(body, post.value, detectPayload);
       } catch {
-        if (!controller.signal.aborted) {
-          const fallbackControls = node("div", undefined, "post-content-actions");
-          fallbackControls.append(
-            action("Copy text", () => copy(post.value, "Text copied.")),
-            action("Type anywhere", () => queueKeydrop(post.value), "button secondary"),
-          );
-          body.append(node("pre", post.value, "reader"), fallbackControls);
-        }
+        if (!controller.signal.aborted) body.append(node("pre", post.value, "reader"),
+          action("Copy text", () => copy(post.value, "Text copied.")));
       }
     } else if (post.kind === "links") {
       const link = node("a", post.value, "external-link");
@@ -961,7 +904,6 @@ postDialog.addEventListener("close", () => {
 
 function renderOldClip(clip) {
   room = null;
-  stopWorkspace();
   feedRequest?.abort();
   showView("clip");
   const target = byId("old-content");
@@ -972,93 +914,6 @@ function renderOldClip(clip) {
   byId("old-title").focus({ preventScroll: true });
   window.scrollTo(0, 0);
 }
-
-let keydropLoader;
-function loadKeydropModule() {
-  if (!keydropLoader) keydropLoader = import("/keydrop.js").catch(error => {
-    keydropLoader = undefined;
-    throw error;
-  });
-  return keydropLoader;
-}
-
-function renderKeydropQueue(items = []) {
-  const list = byId("keydrop-queue");
-  list.replaceChildren();
-  for (const item of items) {
-    const row = node("li");
-    const label = item.preview + " (" + item.mode + ", " + item.length + " chars)";
-    const cancel = action("Cancel", async () => {
-      if (!room) return;
-      try {
-        await roomRequest(room, "type-queue/" + item.id, { method: "DELETE" });
-        loadKeydropQueue();
-      } catch (error) {
-        message(byId("keydrop-message"), error.message);
-      }
-    }, "button secondary");
-    row.append(node("span", label), cancel);
-    list.append(row);
-  }
-  list.hidden = !items.length;
-}
-
-async function loadKeydropQueue() {
-  if (!room || !byId("workspace-tools").open) return;
-  const target = room;
-  try {
-    const data = await (await roomRequest(target, "type-queue")).json();
-    if (room === target) renderKeydropQueue(data.items ?? []);
-  } catch {}
-}
-
-async function queueKeydrop(text) {
-  if (!room) return;
-  const target = room;
-  const value = typeof text === "string" ? text : byId("keydrop-text").value;
-  if (!value.length) {
-    message(byId("keydrop-message"), "Enter or select text to send to KeyDrop.");
-    return;
-  }
-  byId("keydrop-text").value = value;
-  const mode = byId("keydrop-mode").value;
-  const speedMs = Math.min(500, Math.max(0, Number(byId("keydrop-speed").value) || 0));
-  const status = byId("keydrop-message");
-  message(status);
-  try {
-    await roomRequest(target, "type-queue", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: value, mode, speedMs }),
-    });
-    if (room !== target) return;
-    byId("workspace-tools").open = true;
-    await loadKeydropQueue();
-    notify("Queued for KeyDrop (expires in 2 min). Focus target field & trigger extension or bookmarklet.");
-  } catch (error) {
-    if (room === target && error.status === 410) clearView();
-    else if (room === target) message(status, error.message);
-  }
-}
-
-byId("keydrop-send").addEventListener("click", () => queueKeydrop());
-byId("open-keydrop").addEventListener("click", () => {
-  const tools = byId("workspace-tools");
-  tools.open = true;
-  loadKeydropQueue();
-  byId("keydrop-panel").scrollIntoView({ behavior: "smooth", block: "nearest" });
-  byId("keydrop-text").focus({ preventScroll: true });
-});
-byId("workspace-tools").addEventListener("toggle", () => { if (byId("workspace-tools").open) loadKeydropQueue(); });
-byId("keydrop-bookmarklet").addEventListener("click", async () => {
-  if (!room) return;
-  try {
-    const { buildBookmarklet } = await loadKeydropModule();
-    await copy(buildBookmarklet(location.origin, room.code), "Bookmarklet copied. Save it as a browser bookmark.");
-  } catch {
-    message(byId("keydrop-message"), "Could not build the bookmarklet.");
-  }
-});
 
 updateComposer();
 route();
