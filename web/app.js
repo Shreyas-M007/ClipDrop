@@ -1042,6 +1042,13 @@ async function queueKeydrop(text) {
 }
 
 byId("keydrop-send").addEventListener("click", () => queueKeydrop());
+byId("open-keydrop").addEventListener("click", () => {
+  const tools = byId("workspace-tools");
+  tools.open = true;
+  loadKeydropQueue();
+  byId("keydrop-panel").scrollIntoView({ behavior: "smooth", block: "nearest" });
+  byId("keydrop-text").focus({ preventScroll: true });
+});
 byId("workspace-tools").addEventListener("toggle", () => { if (byId("workspace-tools").open) loadKeydropQueue(); });
 byId("keydrop-bookmarklet").addEventListener("click", async () => {
   if (!room) return;

@@ -1,4 +1,5 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 
 import { build } from "esbuild";
 
@@ -17,7 +18,7 @@ const assets = Object.fromEntries(await Promise.all(entries.map(async ([path, fi
 )));
 const landingRenderer = new URL("./dist/landing-render.mjs", import.meta.url);
 await build({ entryPoints: ["web/landing-render.tsx"], platform: "node", external: ["react", "react-dom"], bundle: true, loader: { ".html": "text" },
-  jsx: "automatic", format: "esm", outfile: landingRenderer.pathname });
+  jsx: "automatic", format: "esm", outfile: fileURLToPath(landingRenderer) });
 const { renderLanding } = await import(landingRenderer.href);
 assets["/"][1] = assets["/"][1].replace("<!-- TAPE_LANDING -->", () => renderLanding());
 const landingClient = await build({
