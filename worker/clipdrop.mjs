@@ -11,7 +11,7 @@ const encoder = new TextEncoder();
 
 const policy = {
   "Cache-Control": "no-store",
-  "Content-Security-Policy": "default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'self'",
+  "Content-Security-Policy": "default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self'; media-src 'self' blob:; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'self'",
   "Referrer-Policy": "no-referrer",
   "X-Content-Type-Options": "nosniff",
   "X-Robots-Tag": "noindex, nofollow",
@@ -122,7 +122,7 @@ function describeFiles(files) {
   const attachments = files.map(file => {
     const attachment = {
       name: file.name.replace(/[\u0000-\u001f\u007f/\\]/g, "_").slice(0, 180) || "Attachment",
-      type: IMAGE_TYPES.has(file.type) ? file.type : "application/octet-stream",
+      type: IMAGE_TYPES.has(file.type) || MEDIA_TYPES.test(file.type) ? file.type : "application/octet-stream",
       size: file.size, offset: total,
     };
     total += file.size;
@@ -256,7 +256,7 @@ export function makeWorker(assets) {
       if (!env.BUCKET) return error("Shared storage is currently unavailable.", 503);
       try {
         if (pathname === "/api/rooms" || pathname.startsWith("/api/rooms/")) {
-          return await handleRooms(request, env.BUCKET, url);
+          return await handleRooms(request, env.BUCKET, url, context);
         }
         if (method === "POST" && pathname === "/api/clips") return await createClip(request, env.BUCKET, context);
         const match = pathname.match(/^\/api\/clips\/([^/]+)(?:\/files\/(\d+))?$/);

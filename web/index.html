@@ -8,6 +8,8 @@
 <title>Clipdrop — Shared rooms</title>
 <link rel="preload" href="/inter.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="/landing.css">
+<script src="/landing.js" type="module"></script>
 <script src="/app.js" type="module"></script>
 </head>
 <body>
@@ -23,24 +25,7 @@
 <main class="shell">
   <div id="home">
     <div class="home-panel">
-      <section class="hero" aria-labelledby="home-title">
-        <div class="hero-copy">
-          <h1 id="home-title">One room.<br><em>Anything to share.</em></h1>
-          <p>Start a shared board for notes, links, images, and files. Anyone with the room code can contribute.</p>
-        </div>
-        <div class="hero-art" aria-hidden="true">
-          <div class="art-sheet">
-            <div class="art-top"><span data-icon="grid"></span><b>ROOM BOARD</b><i></i></div>
-            <div class="art-body">
-              <div class="art-tile"><span data-icon="text"></span><div><b>Text</b><i></i></div></div>
-              <div class="art-tile"><span data-icon="link"></span><div><b>Links</b><i></i></div></div>
-              <div class="art-tile"><span data-icon="image"></span><div><b>Images</b><i></i></div></div>
-              <div class="art-tile"><span data-icon="file"></span><div><b>Files</b><i></i></div></div>
-            </div>
-          </div>
-          <div class="art-chip"><span data-icon="hash"></span> TEAM-NOTES</div>
-        </div>
-      </section>
+      <div id="launch"></div>
       <div class="landing-grid">
         <section class="card entry-card" id="create" aria-labelledby="create-title">
           <div class="card-heading"><span class="tile-icon accent" data-icon="plus"></span><div><h2 id="create-title">Create a room</h2><p>Give your team a place to share.</p></div></div>
@@ -88,6 +73,26 @@
       <div><p class="room-kicker"><span></span> Shared room</p><h1 id="room-title" tabindex="-1"></h1><p>Anyone with the code can view and post.</p></div>
       <button type="button" class="code-chip" id="copy-room-code" title="Copy room code"><span data-icon="hash"></span><strong id="active-code"></strong><span data-icon="clipboard"></span></button>
     </section>
+    <details class="card workspace-tools" id="workspace-tools">
+      <summary>Room tools</summary>
+      <div class="tools-body">
+        <h2>Shared scratchpad</h2>
+        <label class="sr-only" for="scratchpad">Shared scratchpad</label>
+        <textarea id="scratchpad" maxlength="50000" placeholder="Write or paste together…" spellcheck="false" disabled></textarea>
+        <p id="scratch-message" class="message" role="status" hidden></p>
+        <div class="room-screen">
+          <h2>Screen sharing</h2>
+          <p class="field-hint">Direct connections require a network path between devices.</p>
+          <div class="post-content-actions">
+            <button class="button secondary" id="start-room-screen" type="button" disabled>Share screen</button>
+            <button class="button secondary" id="stop-room-screen" type="button" hidden>Stop sharing</button>
+          </div>
+          <div id="room-screens"></div>
+          <p id="screen-message" class="message" role="status" hidden></p>
+        </div>
+        <button class="button secondary clear-room" id="reset-room" type="button">Clear room content</button>
+      </div>
+    </details>
     <div class="room-grid">
       <section class="card composer" aria-labelledby="post-title">
         <div class="card-heading"><span class="tile-icon accent" data-icon="plus"></span><div><h2 id="post-title">Add a post</h2><p>Choose what you’re sharing.</p></div></div>
@@ -104,8 +109,11 @@
           <div id="upload-field" hidden>
             <input id="post-files" type="file" multiple hidden>
             <button class="drop" type="button" id="pick-files"><span data-icon="upload"></span><strong>Choose files or drop them here</strong><small>Up to 8 files · 10 MB total</small></button>
+            <button class="button secondary" type="button" id="pick-folder" hidden>Choose a folder</button>
+            <input id="folder-input" type="file" webkitdirectory multiple hidden>
             <ul class="attachment-list" id="selected-files" aria-label="Selected attachments" hidden></ul>
           </div>
+          <label class="sensitive-option"><input id="sensitive" type="checkbox"> Burn after reading or 60 seconds</label>
           <p class="message" id="post-message" role="status" hidden></p>
           <button type="submit" class="button primary full" id="post-button"><span data-icon="plus"></span> Post to room</button>
         </form>

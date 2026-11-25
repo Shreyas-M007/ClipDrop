@@ -1,4 +1,7 @@
 import qrcode from "/qrcode.js";
+import { detectPayload, directoryFiles, readDrop, zipFolder } from "/tools.js";
+import { createScratchpad, createHostedScreens } from "/workspace.js";
+
 
 const icons = {
   clipboard: '<rect x="8" y="3" width="8" height="4" rx="1"/><path d="M16 5h3a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h3m0 7h8m-8 4h6"/>',
@@ -178,6 +181,96 @@ function rememberRoom(entry) {
   renderRecent();
 }
 
+function browserToken() {
+  const storageKey = "clipdrop.clientToken";
+  try {
+    const stored = sessionStorage.getItem(storageKey);
+    if (/^[a-f0-9]{48}$/.test(stored ?? "")) return stored;
+  } catch {}
+  const token = Array.from(crypto.getRandomValues(new Uint8Array(24)), byte => byte.toString(16).padStart(2, "0")).join("");
+  try { sessionStorage.setItem(storageKey, token); } catch {}
+  return token;
+}
+
+const ownerToken = browserToken();
+let revealTimeout;
+
+function roomHeaders(target, headers = {}) {
+  return { ...headers, "X-Room-Generation": target.generation, "X-Clipdrop-Client": ownerToken };
+}
+
+async function roomRequest(target, resource, options = {}) {
+  const response = await fetch("/api/rooms/" + target.code + "/" + resource, {
+    ...options, headers: roomHeaders(target, options.headers),
+  });
+  if (!response.ok && response.status !== 304) {
+    const details = await response.json().catch(() => ({}));
+    const failure = new Error(details.error ?? "Could not reach the room.");
+    failure.status = response.status;
+    throw failure;
+  }
+  return response;
+}
+
+function clearView() {
+  if (!room) return;
+  history.replaceState(null, "", "/");
+  setHome();
+  message(joinMessage, "This room was cleared. Use its code to join again.");
+}
+
+const scratchpad = createScratchpad({
+  textarea: byId("scratchpad"), status: text => message(byId("scratch-message"), text),
+  request: roomRequest, cleared: clearView,
+});
+setInterval(() => scratchpad.tick(), 2200);
+const videos = byId("room-screens");
+const screens = createHostedScreens({
+  controls: byId("workspace-tools"), request: roomRequest,
+  warning: text => message(byId("screen-message"), text), cleared: clearView,
+  draw({ local, incoming }) {
+    const streams = new Map(incoming.map(({ peerId, stream }) => [peerId, stream]));
+    if (local) streams.set("local", local);
+    for (const player of [...videos.children]) {
+      if (!streams.has(player.dataset.id) || streams.get(player.dataset.id) !== player.srcObject) {
+        player.srcObject = null;
+        player.remove();
+      } else streams.delete(player.dataset.id);
+    }
+    for (const [id, stream] of streams) {
+      const player = node("video", undefined, "room-media");
+      player.dataset.id = id;
+      player.srcObject = stream;
+      player.autoplay = player.playsInline = player.controls = true;
+      player.muted = id === "local";
+      player.setAttribute("aria-label", id === "local" ? "Your screen" : "Shared screen");
+      videos.append(player);
+    }
+    byId("start-room-screen").hidden = Boolean(local);
+    byId("stop-room-screen").hidden = !local;
+  },
+});
+setInterval(() => screens.tick(), 2250);
+byId("workspace-tools").addEventListener("toggle", () => screens.tick());
+for (const [id, run] of [["start-room-screen", screens.startScreen], ["stop-room-screen", screens.stopScreen]]) {
+  byId(id).addEventListener("click", async () => {
+    message(byId("screen-message"));
+    try { await run(); } catch (error) { message(byId("screen-message"), error.message); }
+  });
+}
+
+byId("reset-room").addEventListener("click", async () => {
+  if (!room || !confirm("Clear this room’s posts and scratchpad for everyone? The room code will still work.")) return;
+  const target = room;
+  try {
+    await roomRequest(target, "reset", { method: "POST" });
+    if (room === target) clearView();
+  } catch (error) {
+    if (error.status === 410 && room === target) clearView();
+    else message(byId("scratch-message"), error.message);
+  }
+});
+
 function showRoom(entry) {
   const different = room?.code !== entry.code;
   activeFilter = "all";
@@ -195,6 +288,8 @@ function showRoom(entry) {
   document.title = room.name + " · Clipdrop";
   rememberRoom(room);
   showView("room");
+  scratchpad.start(entry);
+  screens.enter(entry);
   setFilter("all");
   byId("room-title").focus({ preventScroll: true });
   window.scrollTo(0, 0);
@@ -205,6 +300,17 @@ function setHome() {
   postLookup?.abort();
   feedRequest?.abort();
   room = null;
+  scratchpad.stop();
+  screens.stop();
+  posts = [];
+  nextPage = null;
+  byId("posts").replaceChildren();
+  byId("detail-body").replaceChildren();
+  postForm.reset();
+  files = { images: [], files: [] };
+  updateComposer();
+  if (postDialog.open) postDialog.close();
+  if (shareDialog.open) shareDialog.close();
   document.title = "Clipdrop — Shared rooms";
   showView("home");
   renderRecent();
@@ -395,6 +501,7 @@ function updateComposer() {
   byId("upload-field").hidden = !files[kind];
   fileInput.accept = kind === "images" ? "image/png,image/jpeg,image/webp,image/gif,image/avif,image/bmp" : "";
   fileInput.value = "";
+  byId("pick-folder").hidden = kind !== "files";
   renderFiles(kind);
 }
 
@@ -451,10 +558,36 @@ fileButton.addEventListener("dragover", event => {
 fileButton.addEventListener("dragleave", event => {
   if (!fileButton.contains(event.relatedTarget)) fileButton.classList.remove("dragging");
 });
-fileButton.addEventListener("drop", event => {
+async function addFolder(entries) {
+  const target = room;
+  if (!target || !entries.length) return;
+  const status = byId("post-message");
+  const root = entries[0].path.split("/")[0];
+  message(status, "Compressing folder…");
+  const archive = await zipFolder(entries, 10_000_000, root + ".zip");
+  if (room !== target) return;
+  formats.find(input => input.value === "files").checked = true;
+  updateComposer();
+  addFiles([archive]);
+}
+
+byId("pick-folder").addEventListener("click", () => byId("folder-input").click());
+byId("folder-input").addEventListener("change", async event => {
+  const entries = directoryFiles(event.target.files);
+  event.target.value = "";
+  try { await addFolder(entries); }
+  catch (error) { message(byId("post-message"), error.message); }
+});
+fileButton.addEventListener("drop", async event => {
   event.preventDefault();
   fileButton.classList.remove("dragging");
-  addFiles(event.dataTransfer.files);
+  const target = room;
+  try {
+    const { folder, entries } = await readDrop(event.dataTransfer);
+    if (target !== room) return;
+    if (folder) await addFolder(entries);
+    else addFiles(entries.map(entry => entry.file));
+  } catch (error) { message(byId("post-message"), error.message); }
 });
 postText.addEventListener("paste", event => {
   if (!event.clipboardData.files.length || byId("post-button").disabled) return;
@@ -477,17 +610,19 @@ postForm.addEventListener("submit", async event => {
   const status = byId("post-message");
   const body = new FormData();
   body.set("kind", kind);
+  body.set("sensitive", String(byId("sensitive").checked));
   if (kind === "text") body.set("value", new Blob([postText.value], { type: "text/plain" }), "note.txt");
   if (kind === "links") body.set("value", byId("post-link").value.trim());
   for (const file of files[kind] ?? []) body.append("file", file);
-  const controls = [...formats, postText, byId("post-link"), fileButton, ...byId("selected-files").querySelectorAll("button")];
+  const controls = [...formats, postText, byId("post-link"), fileButton, byId("pick-folder"), byId("sensitive"), ...byId("selected-files").querySelectorAll("button")];
   message(status);
   button.disabled = true;
   button.lastChild.textContent = " Posting…";
   controls.forEach(control => { control.disabled = true; });
   try {
-    await api("/api/rooms/" + target.code + "/posts", { method: "POST", body });
+    await roomRequest(target, "posts", { method: "POST", body });
     if (room !== target) return;
+    byId("sensitive").checked = false;
     if (kind === "text") postText.value = "";
     if (kind === "links") byId("post-link").value = "";
     if (files[kind]) files[kind] = [];
@@ -496,7 +631,8 @@ postForm.addEventListener("submit", async event => {
     else loadFeed();
     notify("Posted to the room.");
   } catch (error) {
-    if (room === target) message(status, error.message);
+    if (room === target && error.status === 410) clearView();
+    else if (room === target) message(status, error.message);
   } finally {
     controls.forEach(control => { control.disabled = false; });
     byId("post-link").disabled = kindSelected() !== "links";
@@ -517,10 +653,11 @@ function postCard(item) {
   const stamp = node("time", dateFormat.format(new Date(item.createdAt)));
   stamp.dateTime = new Date(item.createdAt).toISOString();
   meta.append(node("span", labels[item.kind]), stamp);
+  if (item.expiresAt) meta.append(node("small", item.own ? "Awaiting recipient" : "One-time access"));
   if (item.count > 1) meta.append(node("small", item.count + " attachments"));
   group.append(meta, node("p", item.summary));
   button.append(group);
-  if (item.kind === "images") {
+  if (item.kind === "images" && !item.expiresAt) {
     const image = node("img");
     image.alt = "";
     image.loading = "lazy";
@@ -531,6 +668,7 @@ function postCard(item) {
 }
 
 function renderFeed() {
+  posts = posts.filter(post => !post.expiresAt || post.expiresAt > Date.now());
   const container = byId("posts");
   const existing = new Map([...container.children].map(child => [child.dataset.id, child]));
   const visible = new Set(posts.map(post => post.id));
@@ -561,7 +699,7 @@ async function loadFeed({ older = false, quiet = false } = {}) {
   more.disabled = true;
   if (!quiet) message(byId("board-message"));
   try {
-    const page = await api("/api/rooms/" + target.code + "/posts?" + params, { signal: request.signal });
+    const page = await (await roomRequest(target, "posts?" + params, { signal: request.signal })).json();
     if (request.signal.aborted || room !== target || activeFilter !== filter) return;
     if (older) {
       const known = new Set(posts.map(item => item.id));
@@ -570,13 +708,14 @@ async function loadFeed({ older = false, quiet = false } = {}) {
     } else {
       const oldestFresh = page.posts.at(-1)?.id;
       const canMerge = oldestFresh && posts.length && oldestFresh >= posts[0].id;
-      posts = canMerge ? [...page.posts, ...posts.filter(item => item.id > oldestFresh)] : page.posts;
+      posts = canMerge ? [...page.posts, ...posts.filter(item => item.id > oldestFresh && !item.expiresAt)] : page.posts;
       if (posts.length <= page.posts.length) nextPage = page.next;
     }
     message(byId("board-message"));
     renderFeed();
   } catch (error) {
-    if (!request.signal.aborted && !quiet) message(byId("board-message"), error.message);
+    if (!request.signal.aborted && error.status === 410 && room === target) clearView();
+    else if (!request.signal.aborted && !quiet) message(byId("board-message"), error.message);
   } finally {
     if (feedRequest === request) {
       feedRequest = null;
@@ -603,7 +742,8 @@ document.querySelectorAll("[data-filter]").forEach(button => button.addEventList
 }));
 byId("refresh").addEventListener("click", () => loadFeed());
 byId("more").addEventListener("click", () => loadFeed({ older: true }));
-setInterval(() => { if (room && !document.hidden) loadFeed({ quiet: true }); }, 8000);
+setInterval(() => { if (room && !document.hidden) loadFeed({ quiet: true }); }, 4000);
+setInterval(() => { if (posts.some(post => post.expiresAt && post.expiresAt <= Date.now())) renderFeed(); }, 1000);
 
 function fileList(parent, attachments, path, largeImages = false) {
   const list = node("ul", undefined, "attachment-list");
@@ -620,6 +760,13 @@ function fileList(parent, attachments, path, largeImages = false) {
         parent.append(image);
       } else row.append(image);
     }
+    if (/^(audio|video)\//.test(file.type) && path.startsWith("/api/rooms/")) {
+      const player = node(file.type.startsWith("audio/") ? "audio" : "video", undefined, "room-media");
+      player.controls = true;
+      player.preload = "metadata";
+      player.src = resource + "?stream";
+      parent.append(player);
+    }
     const download = node("a", "Download");
     download.href = resource;
     download.download = file.name;
@@ -628,6 +775,59 @@ function fileList(parent, attachments, path, largeImages = false) {
     list.append(row);
   });
   parent.append(list);
+}
+
+function downloadBlob(blob, name) {
+  const url = URL.createObjectURL(blob);
+  const link = node("a");
+  link.href = url;
+  link.download = name;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
+
+function addTextTools(body, value) {
+  const output = node("pre", value, "reader");
+  const controls = node("div", undefined, "post-content-actions");
+  const payload = detectPayload(value);
+  controls.append(action("Copy text", () => copy(output.textContent, "Text copied.")));
+  if (payload.format === "code") controls.append(action("Download ." + payload.extension,
+    () => downloadBlob(new Blob([payload.code], { type: "text/plain" }), "clip." + payload.extension)));
+  if (payload.format === "json") controls.append(action("Format JSON", () => { output.textContent = payload.formatted; }));
+  if (payload.format === "base64") controls.append(action("Decode Base64", () => {
+    if (payload.decodedText) output.textContent = payload.decodedText;
+    else downloadBlob(new Blob([payload.decoded]), "decoded.bin");
+  }));
+  body.append(output, controls);
+}
+
+function renderClaim(entry, item, container) {
+  container.replaceChildren(node("p", item.own ? "This post is waiting for a recipient." : "Opening it removes the post for everyone."));
+  if (item.own) return;
+  const button = action(item.count ? "Download and burn" : "Open and burn", async () => {
+    button.disabled = true;
+    try {
+      const response = await roomRequest(entry, "posts/" + item.kind + "/" + item.id + "/claim", { method: "POST" });
+      const content = item.count ? await response.blob() : await response.json();
+      if (room !== entry || !postDialog.open) return;
+      posts = posts.filter(post => post.id !== item.id);
+      renderFeed();
+      container.replaceChildren();
+      if (item.count) {
+        downloadBlob(content, item.filename ?? "attachment");
+        container.append(node("p", "The download was delivered and the shared post was removed."));
+      } else {
+        container.append(node("pre", content.value, "reader"), action("Copy text", () => copy(content.value, "Text copied.")));
+        revealTimeout = setTimeout(() => {
+          if (postDialog.open) postDialog.close();
+        }, 15000);
+      }
+    } catch (error) {
+      if (room === entry && error.status === 410) clearView();
+      else if (room === entry) container.replaceChildren(node("p", error.message, "message"));
+    }
+  }, "button primary");
+  container.append(button);
 }
 
 async function openPost(entry, item) {
@@ -639,13 +839,14 @@ async function openPost(entry, item) {
   message(byId("detail-status"));
   body.replaceChildren(node("p", "Loading post…"));
   postDialog.showModal();
+  if (item.expiresAt) return renderClaim(entry, item, body);
   const path = feedPath(entry, item);
   try {
     const post = await api(path, { signal: controller.signal });
     if (controller.signal.aborted) return;
     body.replaceChildren(node("p", dateFormat.format(new Date(post.createdAt))));
     if (post.kind === "text") {
-      body.append(node("pre", post.value, "reader"), action("Copy text", () => copy(post.value, "Text copied.")));
+      addTextTools(body, post.value);
     } else if (post.kind === "links") {
       const link = node("a", post.value, "external-link");
       link.href = post.value;
@@ -657,10 +858,16 @@ async function openPost(entry, item) {
     if (!controller.signal.aborted) body.replaceChildren(node("p", error.message, "message"));
   }
 }
-postDialog.addEventListener("close", () => postLookup?.abort());
+postDialog.addEventListener("close", () => {
+  postLookup?.abort();
+  clearTimeout(revealTimeout);
+  byId("detail-body").replaceChildren();
+});
 
 function renderOldClip(clip) {
   room = null;
+  scratchpad.stop();
+  screens.stop();
   feedRequest?.abort();
   showView("clip");
   const target = byId("old-content");
