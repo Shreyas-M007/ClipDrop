@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Share text, images and small files across devices using a short code.">
+<meta name="referrer" content="no-referrer">
+<title>Clipdrop — Your clipboard, anywhere</title>
+<link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script>
+</head>
+<body>
+<header class="header"><div class="shell navigation">
+<a class="brand" href="/" aria-label="Clipdrop home"><span class="brand-mark" data-icon="clipboard"></span>Clipdrop<span class="brand-period">.</span></a>
+<nav aria-label="Main navigation"><a href="#how">How it works</a><button class="icon-button" id="theme" type="button" aria-label="Switch theme" data-icon="sun"></button></nav>
+</div></header>
+<main class="shell">
+<section class="hero" aria-labelledby="title">
+<div class="hero-copy"><div class="eyebrow"><span></span> COPY. DROP. SHARE.</div>
+<h1 id="title">Your clipboard,<br><em>anywhere.</em></h1>
+<p>Send text, images, and small files to anyone using a simple share code. Works across devices, with no account needed.</p></div>
+<div class="hero-visual" aria-hidden="true">
+<div class="art-grid"></div><div class="orbit orbit-one"></div><div class="orbit orbit-two"></div>
+<div class="art-star star-one">✦</div><div class="art-star star-two">✧</div><div class="art-star star-three">+</div>
+<div class="art-note"><div class="art-note-head"><div class="art-note-icon" data-icon="clipboard"></div><div><b>New clip</b><span>Ready to share</span></div><i></i></div><div class="art-line"></div><div class="art-line"></div><div class="art-line"></div></div>
+<div class="art-code"><span data-icon="key"></span><b>J9K4-P2X7</b></div>
+</div>
+</section>
+<div class="workspace">
+<section class="panel compose" id="create" aria-labelledby="create-title">
+<div class="panel-header"><span class="panel-icon" data-icon="clipboard"></span><div><h2 id="create-title">Create a clip</h2><p>Give your clipboard a share code.</p></div></div>
+<form id="create-form">
+<label class="field-label" for="clip-text">Text <span>Optional</span></label>
+<div class="editor"><textarea id="clip-text" maxlength="50000" placeholder="Paste or type something here…" spellcheck="false"></textarea><div class="editor-footer"><span id="count">0 / 50,000</span><button class="text-button" id="paste" type="button"><span data-icon="clipboard"></span> Paste</button></div></div>
+<label class="field-label attachment-label" for="file-input">Attachments <span>Optional</span></label>
+<div class="drop" id="drop"><input type="file" id="file-input" multiple><button type="button" id="browse" aria-describedby="file-limit"><span class="upload-icon" data-icon="upload"></span><span><b>Click to upload</b> or drag and drop<span id="file-limit">Images and files · Up to 10 MB total</span></span></button></div>
+<ul id="attachments" class="files" aria-label="Selected attachments" hidden></ul>
+<div class="form-actions"><label class="expiry"><span data-icon="clock"></span><span class="sr-only">Expires after</span><select id="expiry"><option value="3600">1 hour</option><option value="86400" selected>24 hours</option><option value="604800">7 days</option></select><span class="chevron" data-icon="chevron"></span></label><button class="primary" id="create-button" type="submit"><span data-icon="bolt"></span> Generate code</button></div>
+<p class="message" id="create-message" role="status" hidden></p>
+</form>
+<section class="result" id="created" aria-label="Your share code" hidden></section>
+</section>
+<div class="side">
+<section class="panel retrieve" id="retrieve" aria-labelledby="retrieve-title">
+<div class="panel-header"><span class="panel-icon" data-icon="key"></span><div><h2 id="retrieve-title">Retrieve a clip</h2><p>Open a clip with its share code.</p></div></div>
+<form id="retrieve-form"><label class="field-label" for="code">Share code</label><input id="code" name="code" type="text" placeholder="XXXX-XXXX" maxlength="9" autocomplete="off" autocapitalize="characters" spellcheck="false" required>
+<button class="secondary" id="retrieve-button" type="submit"><span data-icon="search"></span> Retrieve clip</button>
+<p class="message" id="retrieve-message" role="status" hidden></p></form>
+<div class="result" id="retrieved" aria-label="Retrieved clip" hidden></div>
+</section>
+<section class="panel how" id="how" aria-labelledby="how-title">
+<h2 id="how-title">How it works</h2>
+<ol><li><span class="step-icon" data-icon="layers"></span><div><b>Add your content</b><p>Paste text or attach a few small files.</p></div></li><li><span class="step-icon" data-icon="hash"></span><div><b>Share the code</b><p>Send the code or link to your recipient.</p></div></li><li><span class="step-icon" data-icon="download"></span><div><b>Retrieve anywhere</b><p>Open the clip on any device before it expires.</p></div></li></ol>
+</section>
+</div>
+</div>
+</main>
+<footer class="shell footer"><a class="footer-brand" href="/">Clipdrop<span>.</span></a><span>Anyone with the code can open its clip.</span></footer>
+<div class="toast" id="toast" role="status" hidden></div>
+</body>
+</html>
