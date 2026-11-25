@@ -258,7 +258,7 @@ byId("create-form").addEventListener("submit", async event => {
   const button = byId("create-button");
   const controls = [editor, byId("paste"), byId("browse"), byId("expiry"), ...picked.querySelectorAll("button")];
   const form = new FormData();
-  form.append("text", editor.value);
+  form.append("text", new Blob([editor.value], { type: "text/plain" }), "clip.txt");
   form.append("expiry", byId("expiry").value);
   for (const file of files) form.append("file", file);
   button.disabled = true;

@@ -79,7 +79,11 @@ async function cleanExpired(bucket, now) {
 async function createClip(request, bucket, context) {
   const form = await readForm(request);
   if (form instanceof Response) return form;
-  const text = form.get("text") ?? "";
+  const content = form.get("text") ?? "";
+  if (typeof content !== "string" && content.size > 150000) {
+    return error("Text can contain up to 50,000 characters.", 400);
+  }
+  const text = typeof content === "string" ? content : await content.text();
   const duration = Number(form.get("expiry"));
   const files = form.getAll("file");
   if (typeof text !== "string" || text.length > 50000) return error("Text can contain up to 50,000 characters.", 400);
