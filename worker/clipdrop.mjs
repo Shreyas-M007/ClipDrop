@@ -68,12 +68,13 @@ async function tokenHash(token) {
   return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join("");
 }
 
-async function readForm(request) {
+async function readForm(request, limit = REQUEST_LIMIT) {
+  const limitMessage = limit === REQUEST_LIMIT ? "Attachments can total up to 10 MB." : "This form is too large.";
   if (!request.headers.get("Content-Type")?.startsWith("multipart/form-data;")) {
     return error("Use the clipboard form to upload a clip.", 415);
   }
-  if (Number(request.headers.get("Content-Length")) > REQUEST_LIMIT) {
-    return error("Attachments can total up to 10 MB.", 413);
+  if (Number(request.headers.get("Content-Length")) > limit) {
+    return error(limitMessage, 413);
   }
   const reader = request.body?.getReader();
   if (!reader) return error("The upload was empty.", 400);
@@ -83,9 +84,9 @@ async function readForm(request) {
     const { done, value } = await reader.read();
     if (done) break;
     size += value.byteLength;
-    if (size > REQUEST_LIMIT) {
+    if (size > limit) {
       await reader.cancel();
-      return error("Attachments can total up to 10 MB.", 413);
+      return error(limitMessage, 413);
     }
     parts.push(value);
   }
@@ -116,6 +117,20 @@ async function cleanExpired(bucket, now) {
   await Promise.all(expired.map(object => retirePayload(bucket, object)));
 }
 
+function describeFiles(files) {
+  let total = 0;
+  const attachments = files.map(file => {
+    const attachment = {
+      name: file.name.replace(/[\u0000-\u001f\u007f/\\]/g, "_").slice(0, 180) || "Attachment",
+      type: IMAGE_TYPES.has(file.type) ? file.type : "application/octet-stream",
+      size: file.size, offset: total,
+    };
+    total += file.size;
+    return attachment;
+  });
+  return { attachments, total };
+}
+
 async function createClip(request, bucket, context) {
   const form = await readForm(request);
   if (form instanceof Response) return form;
@@ -135,16 +150,7 @@ async function createClip(request, bucket, context) {
     return error("Add up to eight files per clip.", 400);
   }
 
-  let total = 0;
-  const attachments = files.map(file => {
-    const attachment = {
-      name: file.name.replace(/[\u0000-\u001f\u007f/\\]/g, "_").slice(0, 180) || "Attachment",
-      type: IMAGE_TYPES.has(file.type) ? file.type : "application/octet-stream",
-      size: file.size, offset: total,
-    };
-    total += file.size;
-    return attachment;
-  });
+  const { attachments, total } = describeFiles(files);
   if (total > FILE_LIMIT) return error("Attachments can total up to 10 MB.", 413);
 
   const createdAt = Date.now();
@@ -172,28 +178,6 @@ async function setActiveCode(bucket, stateKey, previous, code) {
   });
 }
 
-async function rotateClip(request, bucket, stateKey, state, rootCode, root, currentCode) {
-  const form = await readForm(request);
-  if (form instanceof Response) return form;
-  const customCode = requestedCode(form);
-  if (customCode === null) return error(CODE_HELP, 400);
-  const { expiresAt, deleteHash } = root.customMetadata;
-  if (Number(expiresAt) <= Date.now()) return error("This clip has expired.", 404);
-  if (customCode && codeKey(customCode) === currentCode) return error("This is already the clip’s code.", 409);
-
-  for (let attempt = 0; attempt < 4; attempt++) {
-    const code = customCode || shareCode();
-    if (await reserveCode(bucket, code, deleteHash, { rootCode, expiresAt, deleteHash })) {
-      if (!await setActiveCode(bucket, stateKey, state, codeKey(code))) {
-        return error("This clip changed while you were updating it. Open its latest code to try again.", 409);
-      }
-      return json({ code, expiresAt: Number(expiresAt) });
-    }
-    if (customCode) return error("That code is already in use. Try another one.", 409);
-  }
-  return error("Could not generate a code. Try again.", 503);
-}
-
 async function openClip(request, bucket, context, code, fileIndex, preview) {
   const locator = await bucket.head("clips/" + code);
   const missing = () => error("Clip not found or expired. Check the share code.", 404);
@@ -217,8 +201,7 @@ async function openClip(request, bucket, context, code, fileIndex, preview) {
 
   if (request.method !== "GET") {
     const token = request.headers.get("Authorization")?.match(/^Bearer ([a-f0-9]{48})$/)?.[1];
-    if (!token || await tokenHash(token) !== deleteHash) return error("Only the creator can change this clip.", 403);
-    if (request.method === "POST") return rotateClip(request, bucket, stateKey, state, rootCode, root, code);
+    if (!token || await tokenHash(token) !== deleteHash) return error("Only the creator can delete this clip.", 403);
     if (!await setActiveCode(bucket, stateKey, state, null)) {
       return error("This clip changed while you were deleting it. Try again.", 409);
     }
@@ -236,10 +219,13 @@ async function openClip(request, bucket, context, code, fileIndex, preview) {
     return json({ code: locator.customMetadata.displayCode ?? code, text: metadata.text, expiresAt: metadata.expiresAt, attachments });
   }
 
-  const file = metadata.attachments[Number(fileIndex)];
+  return serveAttachment(bucket, key, Number(metadataSize), metadata.attachments[Number(fileIndex)], preview, onlyIf);
+}
+
+async function serveAttachment(bucket, key, metadataSize, file, preview, onlyIf) {
   if (!file || (preview && !IMAGE_TYPES.has(file.type))) return error("Attachment not found.", 404);
   const content = file.size ? await bucket.get(key, {
-    onlyIf, range: { offset: Number(metadataSize) + file.offset, length: file.size },
+    ...(onlyIf ? { onlyIf } : {}), range: { offset: metadataSize + file.offset, length: file.size },
   }) : null;
   if (file.size && !content?.body) return error("Attachment not found.", 404);
   const encodedName = encodeURIComponent(file.name.toWellFormed()).replace(/['()*]/g, char => "%" + char.charCodeAt(0).toString(16));
@@ -262,14 +248,17 @@ export function makeWorker(assets) {
         return new Response(method === "HEAD" ? null : body, { headers: { ...policy, "Content-Type": type } });
       }
       if (!pathname.startsWith("/api/")) return error("Page not found.", 404);
-      const isMutation = method === "POST" || method === "DELETE";
+      const isMutation = method !== "GET" && method !== "HEAD";
       const requester = request.headers.get("Origin");
       if (isMutation && requester && requester !== origin) return error("Open Clipdrop to make changes.", 403);
       if (!env.BUCKET) return error("Shared storage is currently unavailable.", 503);
       try {
+        if (pathname === "/api/rooms" || pathname.startsWith("/api/rooms/")) {
+          return await handleRooms(request, env.BUCKET, url);
+        }
         if (method === "POST" && pathname === "/api/clips") return await createClip(request, env.BUCKET, context);
         const match = pathname.match(/^\/api\/clips\/([^/]+)(?:\/files\/(\d+))?$/);
-        if (!match || (method !== "GET" && !(isMutation && !match[2]))) return error("Page not found.", 404);
+        if (!match || (method !== "GET" && !(method === "DELETE" && !match[2]))) return error("Page not found.", 404);
         if (!CODE_PATTERN.test(match[1])) return error(CODE_HELP, 400);
         const code = codeKey(match[1].toUpperCase());
         return await openClip(request, env.BUCKET, context, code, match[2], url.searchParams.has("preview"));

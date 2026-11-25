@@ -9,6 +9,15 @@ const icons = {
   chevron: '<path d="m6 9 6 6 6-6"/>',
   bolt: '<path d="m13 2-9 12h7l-1 8 10-12h-7l1-8z"/>',
   search: '<circle cx="10.5" cy="10.5" r="6"/><path d="m16 16 4 4"/>',
+  grid: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
+  text: '<path d="M4 6h16M4 11h16M4 16h11M4 21h7"/>',
+  link: '<path d="M10 13a4 4 0 0 0 5.7 0l4-4a4 4 0 0 0-5.7-5.7l-2 2m2 6a4 4 0 0 0-5.7 0l-4 4A4 4 0 0 0 10 21l2-2"/>',
+  image: '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8" cy="8" r="1.5"/><path d="m3 17 5-5 4 4 3-3 6 6"/>',
+  hash: '<path d="m10 4-4 16M18 4l-4 16M4 9h16M3 15h16"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  enter: '<path d="M12 4h8v16h-8m-8-8h11m-4-4 4 4-4 4"/>',
+  share: '<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 10.5 6.8-4m-6.8 7 6.8 4"/>',
+  refresh: '<path d="M20 7v5h-5M4 17v-5h5m-4 0a7 7 0 0 1 12-5l3 3m-1 2a7 7 0 0 1-12 5l-3-3"/>',
   qr: '<rect x="3" y="3" width="6" height="6" rx="1"/><rect x="15" y="3" width="6" height="6" rx="1"/><rect x="3" y="15" width="6" height="6" rx="1"/><path d="M15 15h3v3h3m-6 3h1m5-7v1"/>',
   sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l2 2m10 10 2 2m0-14-2 2M7 17l-2 2"/>',
   moon: '<path d="M20.8 14A9 9 0 0 1 10 3.2 9 9 0 1 0 20.8 14Z"/>',
@@ -24,43 +33,32 @@ function icon(element, name) {
 document.querySelectorAll("[data-icon]").forEach(element => icon(element, element.dataset.icon));
 
 const byId = id => document.getElementById(id);
-const editor = byId("clip-text");
-const count = byId("count");
-const input = byId("file-input");
-const drop = byId("drop");
-const picked = byId("attachments");
-const codeInput = byId("code");
-const retrieveForm = byId("retrieve-form");
-const customCodeInput = byId("custom-code");
-const changeDialog = byId("change-dialog");
-const replacementCode = byId("replacement-code");
-const changeButton = byId("change-button");
-const closeChange = changeDialog.querySelector(".dialog-close");
+const createForm = byId("create-form");
+const joinForm = byId("join-form");
+const joinCode = byId("join-code");
+const joinMessage = byId("join-message");
+const postForm = byId("post-form");
+const postText = byId("post-text");
+const fileInput = byId("post-files");
+const fileButton = byId("pick-files");
 const shareDialog = byId("share-dialog");
-const recentList = byId("recent-list");
-const clearRecent = byId("clear-recent");
-const CLIP_ALPHABET = "[23456789A-HJ-NP-Z]";
-const CODE_PART = CLIP_ALPHABET + "{4}";
-const FULL_CODE = /^[A-Z0-9][A-Z0-9-]{2,22}[A-Z0-9]$/i;
-const CODE_HELP = "Use 4–24 letters, numbers, or hyphens. Start and end with a letter or number.";
-const SPACED_GENERATED = new RegExp("^(" + CODE_PART + ")\\s+(" + CODE_PART + ")$");
-const MESSAGE_CODE = new RegExp("\\b(" + CODE_PART + ")\\s*[-–—]\\s*(" + CODE_PART + ")\\b", "i");
-const created = byId("created");
-const retrieved = byId("retrieved");
-const createMessage = byId("create-message");
-const retrieveMessage = byId("retrieve-message");
-const theme = byId("theme");
-const toast = byId("toast");
-const numberFormat = new Intl.NumberFormat();
-const sizeFormat = new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 });
+const postDialog = byId("post-dialog");
+const codePattern = /^[A-Z0-9][A-Z0-9-]{2,22}[A-Z0-9]$/i;
+const codeHelp = "Use 4–24 letters, numbers, or hyphens. Start and end with a letter or number.";
+const labels = { text: "Text", links: "Links", images: "Images", files: "Files" };
+const formats = [...postForm.querySelectorAll('input[name="kind"]')];
+const imageType = /^(image\/(?:png|jpeg|webp|gif|avif|bmp))$/;
 const dateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" });
-const MAX_SIZE = 10_000_000;
-const MAX_FILES = 8;
-let files = [];
+
+let room;
+let roomLookup;
+let postLookup;
+let activeFilter = "all";
+let feedRequest;
+let nextPage;
+let posts = [];
+let files = { images: [], files: [] };
 let toastTimeout;
-let retrieval;
-let clipToChange;
-let visibleClip;
 
 function node(tag, value, className) {
   const element = document.createElement(tag);
@@ -69,538 +67,610 @@ function node(tag, value, className) {
   return element;
 }
 
-function showMessage(element, value = "") {
-  element.textContent = value;
-  element.hidden = !value;
+function message(target, text = "") {
+  target.textContent = text;
+  target.hidden = !text;
 }
 
-function notify(message) {
-  clearTimeout(toastTimeout);
-  showMessage(toast);
-  showMessage(byId("share-status"));
-  const status = shareDialog.open ? byId("share-status") : toast;
-  showMessage(status, message);
-  toastTimeout = setTimeout(() => showMessage(status), 2700);
+function action(text, run, className = "button secondary") {
+  const button = node("button", text, className);
+  button.type = "button";
+  button.addEventListener("click", run);
+  return button;
 }
 
 function readLocal(key, fallback) {
   try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; }
 }
 
-function saveLocal(key, value) {
+function writeLocal(key, value) {
   try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
 }
 
-function applyTheme(value) {
-  document.documentElement.dataset.theme = value;
-  icon(theme, value === "dark" ? "sun" : "moon");
-  theme.setAttribute("aria-label", value === "dark" ? "Switch to light theme" : "Switch to dark theme");
+function applyTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  const button = byId("theme");
+  icon(button, theme === "dark" ? "sun" : "moon");
+  button.setAttribute("aria-label", theme === "dark" ? "Switch to light theme" : "Switch to dark theme");
 }
 
 applyTheme(readLocal("clipdrop.theme", "light"));
-theme.addEventListener("click", () => {
-  const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
-  applyTheme(next);
-  saveLocal("clipdrop.theme", next);
+byId("theme").addEventListener("click", () => {
+  const theme = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+  applyTheme(theme);
+  writeLocal("clipdrop.theme", theme);
 });
 
-function refreshCount() {
-  count.textContent = numberFormat.format(editor.value.length) + " / 50,000";
+function notify(text) {
+  clearTimeout(toastTimeout);
+  const target = shareDialog.open ? byId("share-status") : postDialog.open ? byId("detail-status") : byId("toast");
+  message(target, text);
+  toastTimeout = setTimeout(() => message(target), 2600);
 }
 
-editor.addEventListener("input", refreshCount);
-byId("paste").addEventListener("click", async () => {
+async function copy(text, confirmation) {
   try {
-    const text = await navigator.clipboard.readText();
-    const free = 50000 - editor.value.length + editor.selectionEnd - editor.selectionStart;
-    editor.setRangeText(text.slice(0, free), editor.selectionStart, editor.selectionEnd, "end");
-    editor.focus();
-    refreshCount();
-    if (text.length > free) showMessage(createMessage, "Text can contain up to 50,000 characters.");
-  } catch {
-    editor.focus();
-    showMessage(createMessage, "Use your device’s paste shortcut to add clipboard content.");
-  }
-});
-
-function sizeLabel(bytes) {
-  if (bytes < 1000) return bytes + " B";
-  if (bytes < 1_000_000) return sizeFormat.format(bytes / 1000) + " KB";
-  return sizeFormat.format(bytes / 1_000_000) + " MB";
-}
-
-function renderFiles() {
-  picked.replaceChildren();
-  files.forEach((file, index) => {
-    const row = node("li", undefined, "file");
-    const remove = node("button");
-    remove.type = "button";
-    remove.setAttribute("aria-label", "Remove " + file.name);
-    icon(remove, "close");
-    remove.addEventListener("click", () => {
-      files.splice(index, 1);
-      showMessage(createMessage);
-      renderFiles();
-      (picked.querySelectorAll("button")[Math.min(index, files.length - 1)] ?? byId("browse")).focus();
-    });
-    row.append(icon(node("span"), "file"), node("span", file.name, "file-name"), node("small", sizeLabel(file.size)), remove);
-    picked.append(row);
-  });
-  picked.hidden = !files.length;
-}
-
-function addFiles(incoming) {
-  if (drop.dataset.busy) return;
-  const next = [...files, ...incoming];
-  if (next.length > MAX_FILES) return showMessage(createMessage, "Add up to eight files per clip.");
-  if (next.reduce((sum, file) => sum + file.size, 0) > MAX_SIZE) {
-    return showMessage(createMessage, "Attachments can total up to 10 MB.");
-  }
-  files = next;
-  renderFiles();
-  showMessage(createMessage);
-}
-
-byId("browse").addEventListener("click", () => input.click());
-input.addEventListener("change", () => {
-  addFiles(input.files);
-  input.value = "";
-});
-drop.addEventListener("dragover", event => {
-  if (!event.dataTransfer.types.includes("Files")) return;
-  event.preventDefault();
-  drop.classList.add("dragging");
-});
-drop.addEventListener("dragleave", event => {
-  if (!drop.contains(event.relatedTarget)) drop.classList.remove("dragging");
-});
-drop.addEventListener("drop", event => {
-  event.preventDefault();
-  drop.classList.remove("dragging");
-  if (event.dataTransfer.files.length) addFiles(event.dataTransfer.files);
-});
-editor.addEventListener("paste", event => {
-  if (!event.clipboardData.files.length) return;
-  addFiles(event.clipboardData.files);
-  if (!event.clipboardData.getData("text/plain")) event.preventDefault();
-});
-
-function extractCode(value) {
-  for (const item of value.match(/https?:\/\/[^\s<>"']+/gi) ?? []) {
-    let url;
-    try { url = new URL(item.replace(/[),.!?;]+$/, "")); } catch { continue; }
-    if (url.origin !== location.origin || url.pathname !== "/") continue;
-    const code = new URLSearchParams(url.hash.slice(1)).get("clip")?.toUpperCase();
-    if (code && FULL_CODE.test(code)) return code;
-  }
-  const plain = value.trim().toUpperCase().replace(/[–—]/g, "-");
-  if (FULL_CODE.test(plain)) return plain;
-  const legacy = plain.match(SPACED_GENERATED);
-  if (legacy) return legacy[1] + "-" + legacy[2];
-  const message = value.replace(/https?:\/\/[^\s<>"']+/gi, " ");
-  const labelled = message.match(/\bcode:\s*([A-Z0-9-]+)\b/i)?.[1]?.toUpperCase();
-  if (labelled && FULL_CODE.test(labelled)) return labelled;
-  const match = message.match(MESSAGE_CODE);
-  return match ? (match[1] + "-" + match[2]).toUpperCase() : null;
-}
-
-codeInput.addEventListener("input", () => showMessage(retrieveMessage));
-codeInput.addEventListener("paste", event => {
-  const code = extractCode(event.clipboardData.getData("text/plain"));
-  if (!code) return;
-  event.preventDefault();
-  codeInput.value = code;
-  showMessage(retrieveMessage);
-});
-
-function focusCode() {
-  byId("retrieve").scrollIntoView({ block: "nearest" });
-  codeInput.focus({ preventScroll: true });
-}
-
-byId("open-nav").addEventListener("click", event => {
-  event.preventDefault();
-  focusCode();
-});
-window.addEventListener("keydown", event => {
-  if (event.key !== "/" || event.metaKey || event.ctrlKey || event.altKey || shareDialog.open ||
-      event.target.closest?.("input, textarea, select, [contenteditable]")) return;
-  event.preventDefault();
-  focusCode();
-});
-
-byId("paste-code").addEventListener("click", async () => {
-  try {
-    const code = extractCode(await navigator.clipboard.readText());
-    if (code) return openCode(code);
-    showMessage(retrieveMessage, "Copy a Clipdrop code or share message first.");
-  } catch {
-    showMessage(retrieveMessage, "Paste into the code field using your device’s paste shortcut.");
-  }
-  focusCode();
-});
-
-async function api(path, options) {
-  const response = await fetch(path, options);
-  if (response.status === 204) return null;
-  const type = response.headers.get("Content-Type");
-  const data = type?.includes("application/json") ? await response.json() : null;
-  if (!response.ok || !data) {
-    const error = new Error(data?.error || "Could not reach Clipdrop. Try again in a moment.");
-    error.status = response.status;
-    throw error;
-  }
-  return data;
-}
-
-async function copy(value, label) {
-  try {
-    await navigator.clipboard.writeText(value);
-    notify(label);
+    await navigator.clipboard.writeText(text);
+    notify(confirmation);
   } catch {
     notify("Clipboard access is unavailable.");
   }
 }
 
-function action(label, callback) {
-  const button = node("button", label);
-  button.type = "button";
-  button.addEventListener("click", callback);
-  return button;
+async function api(path, options = {}) {
+  const response = await fetch(path, options);
+  const value = response.headers.get("Content-Type")?.includes("application/json") ? await response.json() : null;
+  if (!response.ok || !value) {
+    const error = new Error(value?.error ?? "Could not reach Clipdrop. Try again.");
+    error.status = response.status;
+    throw error;
+  }
+  return value;
 }
 
-function tokenList() {
-  return readLocal("clipdrop.tokens", []).filter(clip => clip.expiresAt > Date.now());
-}
-
-function shareURL(code) {
+function shareURL(type, code) {
   const url = new URL("/", location.origin);
-  url.hash = "clip=" + code;
+  url.hash = type + "=" + code;
   return url.href;
 }
 
-function recentClips() {
-  return readLocal("clipdrop.recent", []).filter(entry => FULL_CODE.test(entry.code) && entry.expiresAt > Date.now());
+function joinTarget(value) {
+  for (const item of value.match(/https?:\/\/[^\s<>"']+/gi) ?? []) {
+    let url;
+    try { url = new URL(item.replace(/[),.!?;]+$/, "")); } catch { continue; }
+    if (url.origin !== location.origin || url.pathname !== "/") continue;
+    const query = new URLSearchParams(url.hash.slice(1));
+    for (const type of ["room", "clip"]) {
+      const code = query.get(type);
+      if (code && codePattern.test(code)) return { type, code: code.toUpperCase() };
+    }
+  }
+  const text = value.trim().replace(/[–—]/g, "-");
+  const spaced = text.match(/^([23456789A-HJ-NP-Z]{4})\s+([23456789A-HJ-NP-Z]{4})$/i);
+  const labelled = text.replace(/https?:\/\/[^\s<>"']+/gi, " ").match(/\b(?:room )?code:\s*([a-z0-9-]+)\b/i)?.[1];
+  const code = labelled ?? (spaced ? spaced[1] + "-" + spaced[2] : text);
+  return codePattern.test(code) ? { type: "lookup", code: code.toUpperCase() } : null;
+}
+
+function showView(view) {
+  byId("home").hidden = view !== "home";
+  byId("room").hidden = view !== "room";
+  byId("old-clip").hidden = view !== "clip";
 }
 
 function renderRecent() {
-  const clips = recentClips();
-  recentList.replaceChildren();
-  for (const clip of clips) {
+  const entries = readLocal("clipdrop.recentRooms", []);
+  const list = byId("recent-list");
+  list.replaceChildren();
+  for (const entry of entries) {
     const row = node("li");
-    const button = action(clip.code, () => openCode(clip.code));
-    button.append(node("span", clip.created ? "Created" : "Opened"), icon(node("span"), "chevron"));
+    const button = action(entry.name, () => openDestination({ type: "room", code: entry.code }), "");
+    button.append(node("span", entry.code));
     row.append(button);
-    recentList.append(row);
+    list.append(row);
   }
-  recentList.hidden = !clips.length;
-  clearRecent.hidden = !clips.length;
-  byId("recent-empty").hidden = Boolean(clips.length);
+  byId("recent").hidden = !entries.length;
 }
 
-function rememberClip(clip, createdHere) {
-  const recent = recentClips();
-  const wasCreated = recent.find(item => item.code === clip.code)?.created;
-  saveLocal("clipdrop.recent", [
-    { code: clip.code, expiresAt: clip.expiresAt, created: Boolean(createdHere || wasCreated) },
-    ...recent.filter(item => item.code !== clip.code),
-  ].slice(0, 5));
+function rememberRoom(entry) {
+  const recent = readLocal("clipdrop.recentRooms", []).filter(item => item.code !== entry.code);
+  writeLocal("clipdrop.recentRooms", [{ name: entry.name, code: entry.code }, ...recent].slice(0, 3));
   renderRecent();
 }
 
-function forgetClip(code) {
-  saveLocal("clipdrop.recent", recentClips().filter(item => item.code !== code));
-  renderRecent();
-}
-
-clearRecent.addEventListener("click", () => {
-  saveLocal("clipdrop.recent", []);
-  renderRecent();
-  focusCode();
-});
-window.addEventListener("storage", event => {
-  if (event.key === "clipdrop.recent") renderRecent();
-});
-renderRecent();
-
-function shareAction(clip) {
-  return action("Share clip", () => {
-    const url = shareURL(clip.code);
-    const message = "Open my Clipdrop clip: " + url + "\nCode: " + clip.code +
-      "\nExpires " + dateFormat.format(new Date(clip.expiresAt));
-    const qr = qrcode(0, "M");
-    qr.addData(url);
-    qr.make();
-    const canvas = byId("share-qr");
-    const size = qr.getModuleCount();
-    const scale = 5;
-    const margin = 4;
-    canvas.width = canvas.height = (size + margin * 2) * scale;
-    const ctx = canvas.getContext("2d");
-    ctx.fillStyle = "#fff";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = "#161411";
-    for (let row = 0; row < size; row++) {
-      for (let col = 0; col < size; col++) {
-        if (qr.isDark(row, col)) ctx.fillRect((col + margin) * scale, (row + margin) * scale, scale, scale);
-      }
-    }
-
-    byId("share-code").textContent = clip.code;
-    const actions = byId("share-actions");
-    actions.replaceChildren(
-      action("Copy teammate message", () => copy(message, "Teammate message copied.")),
-      action("Copy link", () => copy(url, "Link copied.")),
-      action("Copy code", () => copy(clip.code, "Code copied.")),
-    );
-    if (typeof navigator.share === "function") {
-      actions.append(action("Share from device", async () => {
-        try {
-          await navigator.share({ title: "Clipdrop", text: "Open my clip with code " + clip.code, url });
-        } catch (error) {
-          if (error.name !== "AbortError") notify("Use Copy teammate message to share this clip.");
-        }
-      }));
-    }
-    showMessage(byId("share-status"));
-    shareDialog.showModal();
-  });
-}
-
-function resultHeader(target, code, expiresAt) {
-  target.replaceChildren(node("strong", code), node("p", "Expires " + dateFormat.format(new Date(expiresAt))));
-  target.hidden = false;
-}
-
-function deleteAction(clip, token, message) {
-  return action("Delete clip", async event => {
-    if (!confirm("Delete this clip for everyone who has its code?")) return;
-    const button = event.currentTarget;
-    button.disabled = true;
-    try {
-      await api("/api/clips/" + clip.code, { method: "DELETE", headers: { Authorization: "Bearer " + token } });
-      saveLocal("clipdrop.tokens", tokenList().filter(item => item.code !== clip.code));
-      forgetClip(clip.code);
-      for (const target of [created, retrieved]) {
-        if (target.dataset.code === clip.code) {
-          target.hidden = true;
-          target.replaceChildren();
-        }
-      }
-      notify("Clip deleted.");
-    } catch (error) {
-      showMessage(message, error.message);
-      button.disabled = false;
-    }
-  });
-}
-
-function renderCreated(clip, token) {
-  resultHeader(created, clip.code, clip.expiresAt);
-  created.dataset.code = clip.code;
-  const actions = node("div", undefined, "result-actions");
-  const share = shareAction(clip);
-  share.classList.add("action-accent");
-  actions.append(share,
-    action("Copy code", () => copy(clip.code, "Code copied.")),
-    action("Copy link", () => copy(shareURL(clip.code), "Link copied.")),
-    changeAction(clip, token),
-    deleteAction(clip, token, createMessage),
-  );
-  created.append(actions);
-}
-
-function changeAction(clip, token) {
-  return action("Change code", () => {
-    clipToChange = { clip, token };
-    replacementCode.value = "";
-    showMessage(byId("change-message"));
-    changeDialog.showModal();
-  });
-}
-
-changeDialog.addEventListener("cancel", event => {
-  if (changeButton.disabled) event.preventDefault();
-});
-
-byId("change-form").addEventListener("submit", async event => {
-  event.preventDefault();
-  if (changeButton.disabled) return;
-  const message = byId("change-message");
-  const code = replacementCode.value.trim();
-  if (code && !FULL_CODE.test(code)) {
-    replacementCode.focus();
-    return showMessage(message, CODE_HELP);
+function showRoom(entry) {
+  const different = room?.code !== entry.code;
+  activeFilter = "all";
+  room = entry;
+  if (different) {
+    postForm.reset();
+    files = { images: [], files: [] };
+    updateComposer();
+    message(byId("post-message"));
   }
-  const { clip, token } = clipToChange;
-  const body = new FormData();
-  body.set("code", code);
-  showMessage(message);
-  changeButton.disabled = true;
-  changeButton.textContent = "Changing…";
-  closeChange.disabled = true;
-  replacementCode.disabled = true;
+  byId("room-title").textContent = room.name;
+  byId("active-code").textContent = room.code;
+  const chip = byId("copy-room-code");
+  chip.setAttribute("aria-label", "Copy room code " + room.code);
+  document.title = room.name + " · Clipdrop";
+  rememberRoom(room);
+  showView("room");
+  setFilter("all");
+  byId("room-title").focus({ preventScroll: true });
+  window.scrollTo(0, 0);
+}
+
+function setHome() {
+  roomLookup?.abort();
+  postLookup?.abort();
+  feedRequest?.abort();
+  room = null;
+  document.title = "Clipdrop — Shared rooms";
+  showView("home");
+  renderRecent();
+}
+
+function updateAddress(type, code) {
+  const target = shareURL(type, code);
+  if (target !== location.href) history.pushState(null, "", target);
+}
+
+async function openDestination({ type, code }) {
+  roomLookup?.abort();
+  const controller = new AbortController();
+  roomLookup = controller;
+  const options = { signal: controller.signal };
+  const button = byId("join-button");
+  button.disabled = true;
+  message(joinMessage);
   try {
-    const changed = await api("/api/clips/" + clip.code, {
-      method: "POST", body, headers: { Authorization: "Bearer " + token },
-    });
-    const updated = { ...changed, deleteToken: token };
-    saveLocal("clipdrop.tokens", [...tokenList().filter(item => item.code !== clip.code).slice(-23), updated]);
-    forgetClip(clip.code);
-    rememberClip(updated, true);
-    if (!created.hidden && created.dataset.code === clip.code) renderCreated(updated, token);
-    if (!retrieved.hidden && retrieved.dataset.code === clip.code) {
-      renderClip({ ...visibleClip, ...changed });
-      codeInput.value = changed.code;
+    let resolved = type;
+    let item;
+    if (type !== "clip") {
+      try {
+        item = await api("/api/rooms/" + code, options);
+        resolved = "room";
+      } catch (error) {
+        if (type !== "lookup" || error.status !== 404) throw error;
+        resolved = "clip";
+      }
     }
-    if (new URLSearchParams(location.hash.slice(1)).get("clip")?.toUpperCase() === clip.code) {
-      history.replaceState(null, "", shareURL(changed.code));
+    if (resolved === "clip") {
+      try {
+        item = await api("/api/clips/" + code, options);
+      } catch (error) {
+        if (type === "lookup" && error.status === 404) throw new Error("Room not found. Check the code and try again.");
+        throw error;
+      }
     }
-    changeDialog.close();
-    (created.dataset.code === changed.code && !created.hidden ? created : retrieved)
-      .querySelector("button")?.focus({ preventScroll: true });
-    notify("Code changed. Share the new code with your teammates.");
+    if (controller.signal.aborted) return;
+    updateAddress(resolved, item.code);
+    if (resolved === "room") showRoom(item);
+    else renderOldClip(item);
   } catch (error) {
-    showMessage(message, error.message);
+    if (controller.signal.aborted) return;
+    setHome();
+    joinCode.value = code;
+    message(joinMessage, error.message);
+    joinCode.focus();
   } finally {
-    changeButton.disabled = false;
-    changeButton.textContent = "Change code";
-    closeChange.disabled = false;
-    replacementCode.disabled = false;
+    if (roomLookup === controller) button.disabled = false;
+  }
+}
+
+function route() {
+  const params = new URLSearchParams(location.hash.slice(1));
+  const type = params.has("room") ? "room" : params.has("clip") ? "clip" : null;
+  if (type && codePattern.test(params.get(type) ?? "")) {
+    openDestination({ type, code: params.get(type).toUpperCase() });
+  } else {
+    setHome();
+    byId("join-button").disabled = false;
+    if (location.hash === "#join") joinCode.focus();
+  }
+}
+
+window.addEventListener("hashchange", route);
+byId("join-nav").addEventListener("click", event => {
+  event.preventDefault();
+  if (location.hash !== "#join") history.pushState(null, "", "#join");
+  route();
+  byId("join").scrollIntoView({ block: "nearest" });
+});
+document.querySelectorAll(".back-home").forEach(link => link.addEventListener("click", event => {
+  event.preventDefault();
+  history.pushState(null, "", "/");
+  route();
+  window.scrollTo(0, 0);
+}));
+
+joinForm.addEventListener("submit", event => {
+  event.preventDefault();
+  const target = joinTarget(joinCode.value);
+  if (target) openDestination(target);
+  else {
+    message(joinMessage, "Enter a room code or paste a Clipdrop share link.");
+    joinCode.focus();
   }
 });
+joinCode.addEventListener("input", () => message(joinMessage));
+byId("paste-code").addEventListener("click", async () => {
+  try {
+    const text = await navigator.clipboard.readText();
+    const target = joinTarget(text);
+    if (target) return openDestination(target);
+    message(joinMessage, "Copy a Clipdrop room code or share link first.");
+  } catch {
+    message(joinMessage, "Use your device’s paste shortcut in the code field.");
+  }
+  joinCode.focus();
+});
 
-byId("create-form").addEventListener("submit", async event => {
+createForm.addEventListener("submit", async event => {
   event.preventDefault();
-  showMessage(createMessage);
-  if (!editor.value.trim() && !files.length) {
-    editor.focus();
-    return showMessage(createMessage, "Add some text or attach a file to create a clip.");
-  }
-  const customCode = customCodeInput.value.trim();
-  if (customCode && !FULL_CODE.test(customCode)) {
-    customCodeInput.focus();
-    return showMessage(createMessage, CODE_HELP);
-  }
   const button = byId("create-button");
-  const controls = [editor, customCodeInput, byId("paste"), byId("browse"), byId("expiry"), ...picked.querySelectorAll("button")];
-  const form = new FormData();
-  form.append("text", new Blob([editor.value], { type: "text/plain" }), "clip.txt");
-  form.append("expiry", byId("expiry").value);
-  if (customCode) form.append("code", customCode);
-  for (const file of files) form.append("file", file);
+  if (button.disabled) return;
+  const codeInput = byId("room-code");
+  const name = byId("room-name");
+  const status = byId("create-message");
+  const code = codeInput.value.trim();
+  if (code && !codePattern.test(code)) {
+    message(status, codeHelp);
+    codeInput.focus();
+    return;
+  }
+  const body = new FormData();
+  body.set("name", name.value.trim());
+  if (code) body.set("code", code);
+  roomLookup?.abort();
+  byId("join-button").disabled = false;
   button.disabled = true;
   button.lastChild.textContent = " Creating…";
-  for (const control of controls) control.disabled = true;
-  drop.dataset.busy = "true";
+  message(status);
   try {
-    const clip = await api("/api/clips", { method: "POST", body: form });
-    saveLocal("clipdrop.tokens", [...tokenList().slice(-23), clip]);
-    renderCreated(clip, clip.deleteToken);
-    rememberClip(clip, true);
-    created.scrollIntoView({ block: "nearest" });
-    notify("Clip ready to share.");
+    const entry = await api("/api/rooms", { method: "POST", body });
+    roomLookup?.abort();
+    byId("join-button").disabled = false;
+    createForm.reset();
+    updateAddress("room", entry.code);
+    showRoom(entry);
   } catch (error) {
-    showMessage(createMessage, error.message);
+    message(status, error.message);
+    if (error.status === 409) codeInput.focus();
   } finally {
-    for (const control of controls) control.disabled = false;
-    delete drop.dataset.busy;
     button.disabled = false;
-    button.lastChild.textContent = " Create clip";
+    button.lastChild.textContent = " Create room";
   }
 });
 
-function renderClip(clip) {
-  visibleClip = clip;
-  codeInput.value = clip.code;
-  resultHeader(retrieved, clip.code, clip.expiresAt);
-  retrieved.dataset.code = clip.code;
-  const actions = node("div", undefined, "result-actions");
-  if (clip.text) {
-    const contents = node("pre", clip.text);
-    contents.tabIndex = 0;
-    retrieved.append(contents);
-    actions.append(action("Copy text", () => copy(clip.text, "Text copied.")));
+function drawQR(canvas, value) {
+  const qr = qrcode(0, "M");
+  qr.addData(value);
+  qr.make();
+  const modules = qr.getModuleCount();
+  const scale = 5;
+  const border = 4;
+  canvas.width = canvas.height = (modules + border * 2) * scale;
+  const context = canvas.getContext("2d");
+  context.fillStyle = "#fff";
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.fillStyle = "#101010";
+  for (let row = 0; row < modules; row++) {
+    for (let col = 0; col < modules; col++) {
+      if (qr.isDark(row, col)) context.fillRect((col + border) * scale, (row + border) * scale, scale, scale);
+    }
   }
-  if (clip.attachments.length) {
-    const list = node("ul", undefined, "files");
-    list.setAttribute("aria-label", "Clip attachments");
-    clip.attachments.forEach((file, index) => {
-      const path = "/api/clips/" + clip.code + "/files/" + index;
-      const row = node("li", undefined, "file");
-      if (file.type.startsWith("image/")) {
-        const image = node("img");
-        image.src = path + "?preview";
-        image.alt = "";
-        image.loading = "lazy";
-        row.append(image);
-      } else {
-        row.append(icon(node("span"), "file"));
-      }
-      const link = node("a", "Download");
-      link.href = path;
-      link.download = file.name;
-      link.setAttribute("aria-label", "Download " + file.name);
-      row.append(node("span", file.name, "file-name"), node("small", sizeLabel(file.size)), link);
-      list.append(row);
-    });
-    retrieved.append(list);
-  }
-  actions.append(shareAction(clip), action("Copy link", () => copy(shareURL(clip.code), "Link copied.")));
-  const ownClip = tokenList().find(item => item.code === clip.code);
-  if (ownClip) actions.append(changeAction(clip, ownClip.deleteToken), deleteAction(clip, ownClip.deleteToken, retrieveMessage));
-  retrieved.append(actions);
 }
 
-retrieveForm.addEventListener("submit", async event => {
+byId("share-room").addEventListener("click", () => {
+  const { code, name } = room;
+  const url = shareURL("room", code);
+  const invite = "Join " + name + " on Clipdrop\n" + url + "\nRoom code: " + code;
+  drawQR(byId("share-qr"), url);
+  byId("share-code").textContent = code;
+  const actions = byId("share-actions");
+  actions.replaceChildren(
+    action("Copy invitation", () => copy(invite, "Invitation copied."), "button yellow"),
+    action("Copy link", () => copy(url, "Link copied.")),
+    action("Copy code", () => copy(code, "Room code copied.")),
+  );
+  if (typeof navigator.share === "function") actions.append(action("Share from device", async () => {
+    try { await navigator.share({ title: name, text: "Join my Clipdrop room", url }); }
+    catch (error) { if (error.name !== "AbortError") notify("Use Copy invitation to share this room."); }
+  }));
+  message(byId("share-status"));
+  shareDialog.showModal();
+});
+byId("copy-room-code").addEventListener("click", () => copy(room.code, "Room code copied."));
+
+function kindSelected() {
+  return formats.find(input => input.checked).value;
+}
+
+function updateComposer() {
+  const kind = kindSelected();
+  byId("text-field").hidden = kind !== "text";
+  byId("link-field").hidden = kind !== "links";
+  byId("post-link").disabled = kind !== "links";
+  byId("upload-field").hidden = !files[kind];
+  fileInput.accept = kind === "images" ? "image/png,image/jpeg,image/webp,image/gif,image/avif,image/bmp" : "";
+  fileInput.value = "";
+  renderFiles(kind);
+}
+
+function renderFiles(kind) {
+  const list = byId("selected-files");
+  list.replaceChildren();
+  (files[kind] ?? []).forEach((file, index) => {
+    const row = node("li");
+    const remove = action("", () => {
+      files[kind].splice(index, 1);
+      renderFiles(kind);
+      (list.querySelectorAll("button")[Math.min(index, list.children.length - 1)] ?? fileButton).focus();
+    }, "icon-button");
+    remove.setAttribute("aria-label", "Remove " + file.name);
+    icon(remove, "close");
+    row.append(node("span", file.name), remove);
+    list.append(row);
+  });
+  list.hidden = !list.children.length;
+}
+
+function addFiles(incoming) {
+  const kind = kindSelected();
+  const status = byId("post-message");
+  if (!files[kind] || byId("post-button").disabled) return;
+  const next = [...files[kind], ...incoming];
+  if (next.length > 8 || next.reduce((size, file) => size + file.size, 0) > 10_000_000) {
+    message(status, "Use up to 8 attachments and 10 MB per post.");
+    return;
+  }
+  if (kind === "images" && next.some(file => !imageType.test(file.type))) {
+    message(status, "Choose PNG, JPEG, WebP, GIF, AVIF, or BMP images.");
+    return;
+  }
+  files[kind] = next;
+  message(status);
+  renderFiles(kind);
+}
+
+formats.forEach(input => input.addEventListener("change", () => {
+  message(byId("post-message"));
+  updateComposer();
+}));
+fileButton.addEventListener("click", () => fileInput.click());
+fileInput.addEventListener("change", () => {
+  addFiles(fileInput.files);
+  fileInput.value = "";
+});
+fileButton.addEventListener("dragover", event => {
+  if (!event.dataTransfer.types.includes("Files")) return;
   event.preventDefault();
-  retrieval?.abort();
-  const request = new AbortController();
-  retrieval = request;
-  const code = extractCode(codeInput.value);
-  const button = byId("retrieve-button");
-  retrieved.hidden = true;
-  retrieved.replaceChildren();
-  showMessage(retrieveMessage);
-  if (!code) {
-    button.disabled = false;
-    button.lastChild.textContent = " Open clip";
-    codeInput.focus();
-    return showMessage(retrieveMessage, "Enter a share code or paste a Clipdrop link or teammate message.");
-  }
-  codeInput.value = code;
+  fileButton.classList.add("dragging");
+});
+fileButton.addEventListener("dragleave", event => {
+  if (!fileButton.contains(event.relatedTarget)) fileButton.classList.remove("dragging");
+});
+fileButton.addEventListener("drop", event => {
+  event.preventDefault();
+  fileButton.classList.remove("dragging");
+  addFiles(event.dataTransfer.files);
+});
+postText.addEventListener("paste", event => {
+  if (!event.clipboardData.files.length || byId("post-button").disabled) return;
+  if (event.clipboardData.getData("text/plain")) return;
+  event.preventDefault();
+  const incoming = [...event.clipboardData.files];
+  const type = incoming.every(file => imageType.test(file.type)) ? "images" : "files";
+  formats.find(input => input.value === type).checked = true;
+  updateComposer();
+  addFiles(incoming);
+  fileButton.focus();
+});
+
+postForm.addEventListener("submit", async event => {
+  event.preventDefault();
+  const button = byId("post-button");
+  if (button.disabled || !room) return;
+  const target = room;
+  const kind = kindSelected();
+  const status = byId("post-message");
+  const body = new FormData();
+  body.set("kind", kind);
+  if (kind === "text") body.set("value", new Blob([postText.value], { type: "text/plain" }), "note.txt");
+  if (kind === "links") body.set("value", byId("post-link").value.trim());
+  for (const file of files[kind] ?? []) body.append("file", file);
+  const controls = [...formats, postText, byId("post-link"), fileButton, ...byId("selected-files").querySelectorAll("button")];
+  message(status);
   button.disabled = true;
-  button.lastChild.textContent = " Opening…";
+  button.lastChild.textContent = " Posting…";
+  controls.forEach(control => { control.disabled = true; });
   try {
-    const clip = await api("/api/clips/" + code, { signal: request.signal });
-    if (request.signal.aborted) return;
-    renderClip(clip);
-    rememberClip(clip, tokenList().some(item => item.code === clip.code));
-    retrieved.scrollIntoView({ block: "nearest" });
-    notify("Clip opened.");
+    await api("/api/rooms/" + target.code + "/posts", { method: "POST", body });
+    if (room !== target) return;
+    if (kind === "text") postText.value = "";
+    if (kind === "links") byId("post-link").value = "";
+    if (files[kind]) files[kind] = [];
+    updateComposer();
+    if (activeFilter !== "all" && activeFilter !== kind) setFilter(kind);
+    else loadFeed();
+    notify("Posted to the room.");
   } catch (error) {
-    if (!request.signal.aborted) {
-      if (error.status === 404) forgetClip(code);
-      showMessage(retrieveMessage, error.message);
-    }
+    if (room === target) message(status, error.message);
   } finally {
-    if (retrieval === request) {
-      button.disabled = false;
-      button.lastChild.textContent = " Open clip";
-    }
+    controls.forEach(control => { control.disabled = false; });
+    byId("post-link").disabled = kindSelected() !== "links";
+    button.disabled = false;
+    button.lastChild.textContent = " Post to room";
   }
 });
 
-function openCode(value) {
-  codeInput.value = value;
-  byId("retrieve").scrollIntoView({ block: "nearest" });
-  retrieveForm.requestSubmit();
+function feedPath(entry, item) {
+  return "/api/rooms/" + entry.code + "/posts/" + item.kind + "/" + item.id;
 }
 
-function openShareLink() {
-  const code = new URLSearchParams(location.hash.slice(1)).get("clip");
-  if (code) openCode(code);
+function postCard(item) {
+  const entry = room;
+  const button = action("", () => openPost(entry, item), "post-card");
+  const group = node("div");
+  const meta = node("div", undefined, "post-meta");
+  const stamp = node("time", dateFormat.format(new Date(item.createdAt)));
+  stamp.dateTime = new Date(item.createdAt).toISOString();
+  meta.append(node("span", labels[item.kind]), stamp);
+  if (item.count > 1) meta.append(node("small", item.count + " attachments"));
+  group.append(meta, node("p", item.summary));
+  button.append(group);
+  if (item.kind === "images") {
+    const image = node("img");
+    image.alt = "";
+    image.loading = "lazy";
+    image.src = feedPath(entry, item) + "/files/0?preview";
+    button.append(image);
+  }
+  return button;
 }
 
-window.addEventListener("hashchange", openShareLink);
-openShareLink();
+function renderFeed() {
+  const container = byId("posts");
+  const existing = new Map([...container.children].map(child => [child.dataset.id, child]));
+  const visible = new Set(posts.map(post => post.id));
+  for (const [id, child] of existing) if (!visible.has(id)) child.remove();
+  posts.forEach((post, index) => {
+    const atIndex = container.children[index];
+    if (atIndex?.dataset.id === post.id) return;
+    const card = existing.get(post.id) ?? postCard(post);
+    card.dataset.id = post.id;
+    container.insertBefore(card, atIndex ?? null);
+  });
+  byId("more").hidden = !nextPage;
+  byId("empty").hidden = posts.length > 0;
+  byId("empty-title").textContent = activeFilter === "all" ? "The board is empty" : "No " + labels[activeFilter].toLowerCase() + " posts yet";
+  byId("empty-copy").textContent = activeFilter === "all" ? "Add the first post to get the room started." : "Share something here or switch to another filter.";
+}
+
+async function loadFeed({ older = false, quiet = false } = {}) {
+  if (!room || (older && !nextPage) || (quiet && feedRequest)) return;
+  feedRequest?.abort();
+  const request = new AbortController();
+  feedRequest = request;
+  const target = room;
+  const filter = activeFilter;
+  const params = new URLSearchParams({ kind: filter });
+  if (older) params.set("after", nextPage);
+  const more = byId("more");
+  more.disabled = true;
+  if (!quiet) message(byId("board-message"));
+  try {
+    const page = await api("/api/rooms/" + target.code + "/posts?" + params, { signal: request.signal });
+    if (request.signal.aborted || room !== target || activeFilter !== filter) return;
+    if (older) {
+      const known = new Set(posts.map(item => item.id));
+      posts.push(...page.posts.filter(item => !known.has(item.id)));
+      nextPage = page.next;
+    } else {
+      const oldestFresh = page.posts.at(-1)?.id;
+      const canMerge = oldestFresh && posts.length && oldestFresh >= posts[0].id;
+      posts = canMerge ? [...page.posts, ...posts.filter(item => item.id > oldestFresh)] : page.posts;
+      if (posts.length <= page.posts.length) nextPage = page.next;
+    }
+    message(byId("board-message"));
+    renderFeed();
+  } catch (error) {
+    if (!request.signal.aborted && !quiet) message(byId("board-message"), error.message);
+  } finally {
+    if (feedRequest === request) {
+      feedRequest = null;
+      more.disabled = false;
+    }
+  }
+}
+
+function setFilter(kind) {
+  activeFilter = kind;
+  for (const button of document.querySelectorAll("[data-filter]")) {
+    button.setAttribute("aria-pressed", String(button.dataset.filter === kind));
+  }
+  posts = [];
+  nextPage = null;
+  byId("posts").replaceChildren();
+  byId("empty").hidden = true;
+  byId("more").hidden = true;
+  loadFeed();
+}
+
+document.querySelectorAll("[data-filter]").forEach(button => button.addEventListener("click", () => {
+  if (activeFilter !== button.dataset.filter) setFilter(button.dataset.filter);
+}));
+byId("refresh").addEventListener("click", () => loadFeed());
+byId("more").addEventListener("click", () => loadFeed({ older: true }));
+setInterval(() => { if (room && !document.hidden) loadFeed({ quiet: true }); }, 8000);
+
+function fileList(parent, attachments, path, largeImages = false) {
+  const list = node("ul", undefined, "attachment-list");
+  attachments.forEach((file, index) => {
+    const row = node("li");
+    const resource = path + "/files/" + index;
+    if (imageType.test(file.type)) {
+      const image = node("img");
+      image.alt = largeImages ? file.name : "";
+      image.src = resource + "?preview";
+      image.loading = "lazy";
+      if (largeImages && index === 0) {
+        image.className = "detail-image";
+        parent.append(image);
+      } else row.append(image);
+    }
+    const download = node("a", "Download");
+    download.href = resource;
+    download.download = file.name;
+    download.setAttribute("aria-label", "Download " + file.name);
+    row.append(node("span", file.name), download);
+    list.append(row);
+  });
+  parent.append(list);
+}
+
+async function openPost(entry, item) {
+  postLookup?.abort();
+  const controller = new AbortController();
+  postLookup = controller;
+  const body = byId("detail-body");
+  byId("detail-title").textContent = labels[item.kind] + " post";
+  message(byId("detail-status"));
+  body.replaceChildren(node("p", "Loading post…"));
+  postDialog.showModal();
+  const path = feedPath(entry, item);
+  try {
+    const post = await api(path, { signal: controller.signal });
+    if (controller.signal.aborted) return;
+    body.replaceChildren(node("p", dateFormat.format(new Date(post.createdAt))));
+    if (post.kind === "text") {
+      body.append(node("pre", post.value, "reader"), action("Copy text", () => copy(post.value, "Text copied.")));
+    } else if (post.kind === "links") {
+      const link = node("a", post.value, "external-link");
+      link.href = post.value;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      body.append(link);
+    } else fileList(body, post.attachments, path, post.kind === "images");
+  } catch (error) {
+    if (!controller.signal.aborted) body.replaceChildren(node("p", error.message, "message"));
+  }
+}
+postDialog.addEventListener("close", () => postLookup?.abort());
+
+function renderOldClip(clip) {
+  room = null;
+  feedRequest?.abort();
+  showView("clip");
+  const target = byId("old-content");
+  target.replaceChildren(node("p", clip.code + " · Expires " + dateFormat.format(new Date(clip.expiresAt))));
+  if (clip.text) target.append(node("pre", clip.text, "reader"), action("Copy text", () => copy(clip.text, "Text copied.")));
+  if (clip.attachments.length) fileList(target, clip.attachments, "/api/clips/" + clip.code);
+  document.title = "Shared clip · Clipdrop";
+  byId("old-title").focus({ preventScroll: true });
+  window.scrollTo(0, 0);
+}
+
+updateComposer();
+route();

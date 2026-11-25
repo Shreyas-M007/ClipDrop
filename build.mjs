@@ -10,7 +10,9 @@ const assets = Object.fromEntries(await Promise.all(entries.map(async ([path, fi
 )));
 assets["/qrcode.js"] = ["text/javascript; charset=utf-8",
   await readFile(new URL(import.meta.resolve("qrcode-generator")), "utf8")];
-const worker = await readFile(new URL("./worker/clipdrop.mjs", import.meta.url), "utf8");
+const worker = await Promise.all(["clipdrop.mjs", "rooms.mjs"].map(file =>
+  readFile(new URL("./worker/" + file, import.meta.url), "utf8"),
+));
 await mkdir(new URL("./dist/server/", import.meta.url), { recursive: true });
 await writeFile(new URL("./dist/server/index.js", import.meta.url),
-  worker + "\nexport default makeWorker(" + JSON.stringify(assets) + ");\n");
+  worker.join("\n") + "\nexport default makeWorker(" + JSON.stringify(assets) + ");\n");
