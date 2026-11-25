@@ -1,3 +1,5 @@
+import qrcode from "/qrcode.js";
+
 const icons = {
   clipboard: '<rect x="8" y="3" width="8" height="4" rx="1"/><path d="M16 5h3a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h3m0 7h8m-8 4h6"/>',
   key: '<circle cx="16" cy="8" r="5"/><path d="m12.5 11.5-9 9H2v-4l3-3h3l3-3"/>',
@@ -7,8 +9,7 @@ const icons = {
   chevron: '<path d="m6 9 6 6 6-6"/>',
   bolt: '<path d="m13 2-9 12h7l-1 8 10-12h-7l1-8z"/>',
   search: '<circle cx="10.5" cy="10.5" r="6"/><path d="m16 16 4 4"/>',
-  layers: '<path d="m12 3 9 5-9 5-9-5 9-5Zm-9 9 9 5 9-5m-18 4 9 5 9-5"/>',
-  hash: '<path d="m10 4-4 16M18 4l-4 16M4 9h16M3 15h16"/>',
+  qr: '<rect x="3" y="3" width="6" height="6" rx="1"/><rect x="15" y="3" width="6" height="6" rx="1"/><rect x="3" y="15" width="6" height="6" rx="1"/><path d="M15 15h3v3h3m-6 3h1m5-7v1"/>',
   sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l2 2m10 10 2 2m0-14-2 2M7 17l-2 2"/>',
   moon: '<path d="M20.8 14A9 9 0 0 1 10 3.2 9 9 0 1 0 20.8 14Z"/>',
   file: '<path d="M6 3h8l4 4v14H6zM14 3v5h4M9 13h6m-6 4h6"/>',
@@ -29,6 +30,14 @@ const input = byId("file-input");
 const drop = byId("drop");
 const picked = byId("attachments");
 const codeInput = byId("code");
+const retrieveForm = byId("retrieve-form");
+const shareDialog = byId("share-dialog");
+const recentList = byId("recent-list");
+const clearRecent = byId("clear-recent");
+const CLIP_ALPHABET = "[23456789A-HJ-NP-Z]";
+const CODE_PART = CLIP_ALPHABET + "{4}";
+const FULL_CODE = new RegExp("^" + CODE_PART + "-" + CODE_PART + "$");
+const MESSAGE_CODE = new RegExp("\\b(" + CODE_PART + ")\\s*[-–—]\\s*(" + CODE_PART + ")\\b", "i");
 const created = byId("created");
 const retrieved = byId("retrieved");
 const createMessage = byId("create-message");
@@ -58,8 +67,11 @@ function showMessage(element, value = "") {
 
 function notify(message) {
   clearTimeout(toastTimeout);
-  showMessage(toast, message);
-  toastTimeout = setTimeout(() => showMessage(toast), 2700);
+  showMessage(toast);
+  showMessage(byId("share-status"));
+  const status = shareDialog.open ? byId("share-status") : toast;
+  showMessage(status, message);
+  toastTimeout = setTimeout(() => showMessage(status), 2700);
 }
 
 function readLocal(key, fallback) {
@@ -76,7 +88,7 @@ function applyTheme(value) {
   theme.setAttribute("aria-label", value === "dark" ? "Switch to light theme" : "Switch to dark theme");
 }
 
-applyTheme(readLocal("clipdrop.theme", "dark"));
+applyTheme(readLocal("clipdrop.theme", "light"));
 theme.addEventListener("click", () => {
   const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
   applyTheme(next);
@@ -164,26 +176,57 @@ editor.addEventListener("paste", event => {
   if (!event.clipboardData.getData("text/plain")) event.preventDefault();
 });
 
-function formatCode(value) {
-  const clean = value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8);
-  return clean.length <= 4 ? clean : clean.slice(0, 4) + "-" + clean.slice(4);
+function extractCode(value) {
+  for (const item of value.match(/https?:\/\/[^\s<>"']+/gi) ?? []) {
+    let url;
+    try { url = new URL(item.replace(/[),.!?;]+$/, "")); } catch { continue; }
+    if (url.origin !== location.origin || url.pathname !== "/") continue;
+    const code = new URLSearchParams(url.hash.slice(1)).get("clip")?.toUpperCase();
+    if (code && FULL_CODE.test(code)) return code;
+  }
+  const compact = value.trim().toUpperCase().replace(/[\s\-–—]/g, "");
+  if (compact.length === 8) {
+    const code = compact.slice(0, 4) + "-" + compact.slice(4);
+    if (FULL_CODE.test(code)) return code;
+  }
+  const match = value.replace(/https?:\/\/[^\s<>"']+/gi, " ").match(MESSAGE_CODE);
+  return match ? (match[1] + "-" + match[2]).toUpperCase() : null;
 }
 
-codeInput.addEventListener("input", () => {
-  const raw = codeInput.value;
-  const position = codeInput.selectionStart;
-  codeInput.value = formatCode(raw);
-  if (position < raw.length) {
-    const nextPosition = formatCode(raw.slice(0, position)).length;
-    codeInput.setSelectionRange(nextPosition, nextPosition);
-  }
-});
+codeInput.addEventListener("input", () => showMessage(retrieveMessage));
 codeInput.addEventListener("paste", event => {
-  const value = event.clipboardData.getData("text");
-  const shared = value.match(/#clip=([A-Z0-9-]+)/i)?.[1];
-  if (!shared) return;
+  const code = extractCode(event.clipboardData.getData("text/plain"));
+  if (!code) return;
   event.preventDefault();
-  codeInput.value = formatCode(shared);
+  codeInput.value = code;
+  showMessage(retrieveMessage);
+});
+
+function focusCode() {
+  byId("retrieve").scrollIntoView({ block: "nearest" });
+  codeInput.focus({ preventScroll: true });
+}
+
+byId("open-nav").addEventListener("click", event => {
+  event.preventDefault();
+  focusCode();
+});
+window.addEventListener("keydown", event => {
+  if (event.key !== "/" || event.metaKey || event.ctrlKey || event.altKey || shareDialog.open ||
+      event.target.closest?.("input, textarea, select, [contenteditable]")) return;
+  event.preventDefault();
+  focusCode();
+});
+
+byId("paste-code").addEventListener("click", async () => {
+  try {
+    const code = extractCode(await navigator.clipboard.readText());
+    if (code) return openCode(code);
+    showMessage(retrieveMessage, "Copy a Clipdrop code or share message first.");
+  } catch {
+    showMessage(retrieveMessage, "Paste into the code field using your device’s paste shortcut.");
+  }
+  focusCode();
 });
 
 async function api(path, options) {
@@ -191,7 +234,11 @@ async function api(path, options) {
   if (response.status === 204) return null;
   const type = response.headers.get("Content-Type");
   const data = type?.includes("application/json") ? await response.json() : null;
-  if (!response.ok || !data) throw new Error(data?.error || "Could not reach Clipdrop. Try again in a moment.");
+  if (!response.ok || !data) {
+    const error = new Error(data?.error || "Could not reach Clipdrop. Try again in a moment.");
+    error.status = response.status;
+    throw error;
+  }
   return data;
 }
 
@@ -221,6 +268,94 @@ function shareURL(code) {
   return url.href;
 }
 
+function recentClips() {
+  return readLocal("clipdrop.recent", []).filter(entry => FULL_CODE.test(entry.code) && entry.expiresAt > Date.now());
+}
+
+function renderRecent() {
+  const clips = recentClips();
+  recentList.replaceChildren();
+  for (const clip of clips) {
+    const row = node("li");
+    const button = action(clip.code, () => openCode(clip.code));
+    button.append(node("span", clip.created ? "Created" : "Opened"), icon(node("span"), "chevron"));
+    row.append(button);
+    recentList.append(row);
+  }
+  recentList.hidden = !clips.length;
+  clearRecent.hidden = !clips.length;
+  byId("recent-empty").hidden = Boolean(clips.length);
+}
+
+function rememberClip(clip, createdHere) {
+  const recent = recentClips();
+  const wasCreated = recent.find(item => item.code === clip.code)?.created;
+  saveLocal("clipdrop.recent", [
+    { code: clip.code, expiresAt: clip.expiresAt, created: Boolean(createdHere || wasCreated) },
+    ...recent.filter(item => item.code !== clip.code),
+  ].slice(0, 5));
+  renderRecent();
+}
+
+function forgetClip(code) {
+  saveLocal("clipdrop.recent", recentClips().filter(item => item.code !== code));
+  renderRecent();
+}
+
+clearRecent.addEventListener("click", () => {
+  saveLocal("clipdrop.recent", []);
+  renderRecent();
+  focusCode();
+});
+window.addEventListener("storage", event => {
+  if (event.key === "clipdrop.recent") renderRecent();
+});
+renderRecent();
+
+function shareAction(clip) {
+  return action("Share clip", () => {
+    const url = shareURL(clip.code);
+    const message = "Open my Clipdrop clip: " + url + "\nCode: " + clip.code +
+      "\nExpires " + dateFormat.format(new Date(clip.expiresAt));
+    const qr = qrcode(0, "M");
+    qr.addData(url);
+    qr.make();
+    const canvas = byId("share-qr");
+    const size = qr.getModuleCount();
+    const scale = 5;
+    const margin = 4;
+    canvas.width = canvas.height = (size + margin * 2) * scale;
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "#161411";
+    for (let row = 0; row < size; row++) {
+      for (let col = 0; col < size; col++) {
+        if (qr.isDark(row, col)) ctx.fillRect((col + margin) * scale, (row + margin) * scale, scale, scale);
+      }
+    }
+
+    byId("share-code").textContent = clip.code;
+    const actions = byId("share-actions");
+    actions.replaceChildren(
+      action("Copy teammate message", () => copy(message, "Teammate message copied.")),
+      action("Copy link", () => copy(url, "Link copied.")),
+      action("Copy code", () => copy(clip.code, "Code copied.")),
+    );
+    if (typeof navigator.share === "function") {
+      actions.append(action("Share from device", async () => {
+        try {
+          await navigator.share({ title: "Clipdrop", text: "Open my clip with code " + clip.code, url });
+        } catch (error) {
+          if (error.name !== "AbortError") notify("Use Copy teammate message to share this clip.");
+        }
+      }));
+    }
+    showMessage(byId("share-status"));
+    shareDialog.showModal();
+  });
+}
+
 function resultHeader(target, code, expiresAt) {
   target.replaceChildren(node("strong", code), node("p", "Expires " + dateFormat.format(new Date(expiresAt))));
   target.hidden = false;
@@ -234,6 +369,7 @@ function deleteAction(clip, token, message) {
     try {
       await api("/api/clips/" + clip.code, { method: "DELETE", headers: { Authorization: "Bearer " + token } });
       saveLocal("clipdrop.tokens", tokenList().filter(item => item.code !== clip.code));
+      forgetClip(clip.code);
       for (const target of [created, retrieved]) {
         if (target.dataset.code === clip.code) {
           target.hidden = true;
@@ -271,9 +407,13 @@ byId("create-form").addEventListener("submit", async event => {
     resultHeader(created, clip.code, clip.expiresAt);
     created.dataset.code = clip.code;
     const actions = node("div", undefined, "result-actions");
-    actions.append(action("Copy code", () => copy(clip.code, "Code copied.")),
+    const share = shareAction(clip);
+    share.classList.add("action-accent");
+    actions.append(share, action("Copy code", () => copy(clip.code, "Code copied.")),
       action("Copy link", () => copy(shareURL(clip.code), "Link copied.")), deleteAction(clip, clip.deleteToken, createMessage));
     created.append(actions);
+    rememberClip(clip, true);
+    created.scrollIntoView({ block: "nearest" });
     notify("Clip ready to share.");
   } catch (error) {
     showMessage(createMessage, error.message);
@@ -319,51 +459,60 @@ function renderClip(clip) {
     });
     retrieved.append(list);
   }
-  actions.append(action("Copy link", () => copy(shareURL(clip.code), "Link copied.")));
+  actions.append(shareAction(clip), action("Copy link", () => copy(shareURL(clip.code), "Link copied.")));
   const ownClip = tokenList().find(item => item.code === clip.code);
   if (ownClip) actions.append(deleteAction(clip, ownClip.deleteToken, retrieveMessage));
   retrieved.append(actions);
 }
 
-byId("retrieve-form").addEventListener("submit", async event => {
+retrieveForm.addEventListener("submit", async event => {
   event.preventDefault();
   retrieval?.abort();
   const request = new AbortController();
   retrieval = request;
-  const code = formatCode(codeInput.value);
+  const code = extractCode(codeInput.value);
   const button = byId("retrieve-button");
   retrieved.hidden = true;
   retrieved.replaceChildren();
   showMessage(retrieveMessage);
-  if (!/^[23456789A-HJ-NP-Z]{4}-[23456789A-HJ-NP-Z]{4}$/.test(code)) {
+  if (!code) {
     button.disabled = false;
-    button.lastChild.textContent = " Retrieve clip";
+    button.lastChild.textContent = " Open clip";
     codeInput.focus();
-    return showMessage(retrieveMessage, "Enter a valid eight-character share code.");
+    return showMessage(retrieveMessage, "Enter an eight-character code or paste a Clipdrop share link.");
   }
+  codeInput.value = code;
   button.disabled = true;
-  button.lastChild.textContent = " Retrieving…";
+  button.lastChild.textContent = " Opening…";
   try {
     const clip = await api("/api/clips/" + code, { signal: request.signal });
     if (request.signal.aborted) return;
     renderClip(clip);
+    rememberClip(clip, tokenList().some(item => item.code === code));
+    retrieved.scrollIntoView({ block: "nearest" });
     notify("Clip opened.");
   } catch (error) {
-    if (!request.signal.aborted) showMessage(retrieveMessage, error.message);
+    if (!request.signal.aborted) {
+      if (error.status === 404) forgetClip(code);
+      showMessage(retrieveMessage, error.message);
+    }
   } finally {
     if (retrieval === request) {
       button.disabled = false;
-      button.lastChild.textContent = " Retrieve clip";
+      button.lastChild.textContent = " Open clip";
     }
   }
 });
 
+function openCode(value) {
+  codeInput.value = value;
+  byId("retrieve").scrollIntoView({ block: "nearest" });
+  retrieveForm.requestSubmit();
+}
+
 function openShareLink() {
   const code = new URLSearchParams(location.hash.slice(1)).get("clip");
-  if (!code) return;
-  codeInput.value = formatCode(code);
-  byId("retrieve").scrollIntoView();
-  byId("retrieve-form").requestSubmit();
+  if (code) openCode(code);
 }
 
 window.addEventListener("hashchange", openShareLink);

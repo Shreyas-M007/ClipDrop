@@ -1,1 +1,1 @@
-{"private":true,"type":"module","scripts":{"build":"node build.mjs"}}
+{"private":true,"type":"module","scripts":{"build":"node build.mjs"},"dependencies":{"qrcode-generator":"2.0.4"}}
