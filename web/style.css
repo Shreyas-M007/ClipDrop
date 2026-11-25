@@ -271,3 +271,12 @@ dialog > p { color: var(--muted); margin: 7px 0 16px; font-size: .9rem; }
   .footer { align-items: flex-start; }
 }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+
+.custom-code { margin-top: 16px; }
+.code-option {
+  width: 100%; padding: 10px 12px; min-height: 42px; border: 1px solid var(--line);
+  border-radius: 8px; background: var(--inset); font: 650 .92rem ui-monospace, monospace;
+}
+.code-option::placeholder { color: var(--muted); font-weight: 500; }
+.field-hint { margin-top: 5px; color: var(--muted); font-size: .8rem; }
+#change-button { margin-top: 12px; width: 100%; }

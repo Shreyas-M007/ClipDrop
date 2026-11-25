@@ -31,12 +31,19 @@ const drop = byId("drop");
 const picked = byId("attachments");
 const codeInput = byId("code");
 const retrieveForm = byId("retrieve-form");
+const customCodeInput = byId("custom-code");
+const changeDialog = byId("change-dialog");
+const replacementCode = byId("replacement-code");
+const changeButton = byId("change-button");
+const closeChange = changeDialog.querySelector(".dialog-close");
 const shareDialog = byId("share-dialog");
 const recentList = byId("recent-list");
 const clearRecent = byId("clear-recent");
 const CLIP_ALPHABET = "[23456789A-HJ-NP-Z]";
 const CODE_PART = CLIP_ALPHABET + "{4}";
-const FULL_CODE = new RegExp("^" + CODE_PART + "-" + CODE_PART + "$");
+const FULL_CODE = /^[A-Z0-9][A-Z0-9-]{2,22}[A-Z0-9]$/i;
+const CODE_HELP = "Use 4–24 letters, numbers, or hyphens. Start and end with a letter or number.";
+const SPACED_GENERATED = new RegExp("^(" + CODE_PART + ")\\s+(" + CODE_PART + ")$");
 const MESSAGE_CODE = new RegExp("\\b(" + CODE_PART + ")\\s*[-–—]\\s*(" + CODE_PART + ")\\b", "i");
 const created = byId("created");
 const retrieved = byId("retrieved");
@@ -52,6 +59,8 @@ const MAX_FILES = 8;
 let files = [];
 let toastTimeout;
 let retrieval;
+let clipToChange;
+let visibleClip;
 
 function node(tag, value, className) {
   const element = document.createElement(tag);
@@ -184,12 +193,14 @@ function extractCode(value) {
     const code = new URLSearchParams(url.hash.slice(1)).get("clip")?.toUpperCase();
     if (code && FULL_CODE.test(code)) return code;
   }
-  const compact = value.trim().toUpperCase().replace(/[\s\-–—]/g, "");
-  if (compact.length === 8) {
-    const code = compact.slice(0, 4) + "-" + compact.slice(4);
-    if (FULL_CODE.test(code)) return code;
-  }
-  const match = value.replace(/https?:\/\/[^\s<>"']+/gi, " ").match(MESSAGE_CODE);
+  const plain = value.trim().toUpperCase().replace(/[–—]/g, "-");
+  if (FULL_CODE.test(plain)) return plain;
+  const legacy = plain.match(SPACED_GENERATED);
+  if (legacy) return legacy[1] + "-" + legacy[2];
+  const message = value.replace(/https?:\/\/[^\s<>"']+/gi, " ");
+  const labelled = message.match(/\bcode:\s*([A-Z0-9-]+)\b/i)?.[1]?.toUpperCase();
+  if (labelled && FULL_CODE.test(labelled)) return labelled;
+  const match = message.match(MESSAGE_CODE);
   return match ? (match[1] + "-" + match[2]).toUpperCase() : null;
 }
 
@@ -384,6 +395,81 @@ function deleteAction(clip, token, message) {
   });
 }
 
+function renderCreated(clip, token) {
+  resultHeader(created, clip.code, clip.expiresAt);
+  created.dataset.code = clip.code;
+  const actions = node("div", undefined, "result-actions");
+  const share = shareAction(clip);
+  share.classList.add("action-accent");
+  actions.append(share,
+    action("Copy code", () => copy(clip.code, "Code copied.")),
+    action("Copy link", () => copy(shareURL(clip.code), "Link copied.")),
+    changeAction(clip, token),
+    deleteAction(clip, token, createMessage),
+  );
+  created.append(actions);
+}
+
+function changeAction(clip, token) {
+  return action("Change code", () => {
+    clipToChange = { clip, token };
+    replacementCode.value = "";
+    showMessage(byId("change-message"));
+    changeDialog.showModal();
+  });
+}
+
+changeDialog.addEventListener("cancel", event => {
+  if (changeButton.disabled) event.preventDefault();
+});
+
+byId("change-form").addEventListener("submit", async event => {
+  event.preventDefault();
+  if (changeButton.disabled) return;
+  const message = byId("change-message");
+  const code = replacementCode.value.trim();
+  if (code && !FULL_CODE.test(code)) {
+    replacementCode.focus();
+    return showMessage(message, CODE_HELP);
+  }
+  const { clip, token } = clipToChange;
+  const body = new FormData();
+  body.set("code", code);
+  showMessage(message);
+  changeButton.disabled = true;
+  changeButton.textContent = "Changing…";
+  closeChange.disabled = true;
+  replacementCode.disabled = true;
+  try {
+    const changed = await api("/api/clips/" + clip.code, {
+      method: "POST", body, headers: { Authorization: "Bearer " + token },
+    });
+    const updated = { ...changed, deleteToken: token };
+    saveLocal("clipdrop.tokens", [...tokenList().filter(item => item.code !== clip.code).slice(-23), updated]);
+    forgetClip(clip.code);
+    rememberClip(updated, true);
+    if (!created.hidden && created.dataset.code === clip.code) renderCreated(updated, token);
+    if (!retrieved.hidden && retrieved.dataset.code === clip.code) {
+      renderClip({ ...visibleClip, ...changed });
+      codeInput.value = changed.code;
+    }
+    if (new URLSearchParams(location.hash.slice(1)).get("clip")?.toUpperCase() === clip.code) {
+      history.replaceState(null, "", shareURL(changed.code));
+    }
+    changeDialog.close();
+    (created.dataset.code === changed.code && !created.hidden ? created : retrieved)
+      .querySelector("button")?.focus({ preventScroll: true });
+    notify("Code changed. Share the new code with your teammates.");
+  } catch (error) {
+    showMessage(message, error.message);
+  } finally {
+    changeButton.disabled = false;
+    changeButton.textContent = "Change code";
+    closeChange.disabled = false;
+    replacementCode.disabled = false;
+  }
+});
+
 byId("create-form").addEventListener("submit", async event => {
   event.preventDefault();
   showMessage(createMessage);
@@ -391,27 +477,26 @@ byId("create-form").addEventListener("submit", async event => {
     editor.focus();
     return showMessage(createMessage, "Add some text or attach a file to create a clip.");
   }
+  const customCode = customCodeInput.value.trim();
+  if (customCode && !FULL_CODE.test(customCode)) {
+    customCodeInput.focus();
+    return showMessage(createMessage, CODE_HELP);
+  }
   const button = byId("create-button");
-  const controls = [editor, byId("paste"), byId("browse"), byId("expiry"), ...picked.querySelectorAll("button")];
+  const controls = [editor, customCodeInput, byId("paste"), byId("browse"), byId("expiry"), ...picked.querySelectorAll("button")];
   const form = new FormData();
   form.append("text", new Blob([editor.value], { type: "text/plain" }), "clip.txt");
   form.append("expiry", byId("expiry").value);
+  if (customCode) form.append("code", customCode);
   for (const file of files) form.append("file", file);
   button.disabled = true;
-  button.lastChild.textContent = " Generating…";
+  button.lastChild.textContent = " Creating…";
   for (const control of controls) control.disabled = true;
   drop.dataset.busy = "true";
   try {
     const clip = await api("/api/clips", { method: "POST", body: form });
     saveLocal("clipdrop.tokens", [...tokenList().slice(-23), clip]);
-    resultHeader(created, clip.code, clip.expiresAt);
-    created.dataset.code = clip.code;
-    const actions = node("div", undefined, "result-actions");
-    const share = shareAction(clip);
-    share.classList.add("action-accent");
-    actions.append(share, action("Copy code", () => copy(clip.code, "Code copied.")),
-      action("Copy link", () => copy(shareURL(clip.code), "Link copied.")), deleteAction(clip, clip.deleteToken, createMessage));
-    created.append(actions);
+    renderCreated(clip, clip.deleteToken);
     rememberClip(clip, true);
     created.scrollIntoView({ block: "nearest" });
     notify("Clip ready to share.");
@@ -421,11 +506,13 @@ byId("create-form").addEventListener("submit", async event => {
     for (const control of controls) control.disabled = false;
     delete drop.dataset.busy;
     button.disabled = false;
-    button.lastChild.textContent = " Generate code";
+    button.lastChild.textContent = " Create clip";
   }
 });
 
 function renderClip(clip) {
+  visibleClip = clip;
+  codeInput.value = clip.code;
   resultHeader(retrieved, clip.code, clip.expiresAt);
   retrieved.dataset.code = clip.code;
   const actions = node("div", undefined, "result-actions");
@@ -461,7 +548,7 @@ function renderClip(clip) {
   }
   actions.append(shareAction(clip), action("Copy link", () => copy(shareURL(clip.code), "Link copied.")));
   const ownClip = tokenList().find(item => item.code === clip.code);
-  if (ownClip) actions.append(deleteAction(clip, ownClip.deleteToken, retrieveMessage));
+  if (ownClip) actions.append(changeAction(clip, ownClip.deleteToken), deleteAction(clip, ownClip.deleteToken, retrieveMessage));
   retrieved.append(actions);
 }
 
@@ -479,7 +566,7 @@ retrieveForm.addEventListener("submit", async event => {
     button.disabled = false;
     button.lastChild.textContent = " Open clip";
     codeInput.focus();
-    return showMessage(retrieveMessage, "Enter an eight-character code or paste a Clipdrop share link.");
+    return showMessage(retrieveMessage, "Enter a share code or paste a Clipdrop link or teammate message.");
   }
   codeInput.value = code;
   button.disabled = true;
@@ -488,7 +575,7 @@ retrieveForm.addEventListener("submit", async event => {
     const clip = await api("/api/clips/" + code, { signal: request.signal });
     if (request.signal.aborted) return;
     renderClip(clip);
-    rememberClip(clip, tokenList().some(item => item.code === code));
+    rememberClip(clip, tokenList().some(item => item.code === clip.code));
     retrieved.scrollIntoView({ block: "nearest" });
     notify("Clip opened.");
   } catch (error) {

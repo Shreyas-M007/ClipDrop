@@ -33,7 +33,12 @@
 <label class="field-label attachment-label" for="file-input">Attachments <span>Optional</span></label>
 <div class="drop" id="drop"><input type="file" id="file-input" multiple><button type="button" id="browse" aria-describedby="file-limit"><span class="upload-icon" data-icon="upload"></span><span><b>Choose files</b> or drag and drop<span id="file-limit">Up to 8 files · 10 MB total</span></span></button></div>
 <ul id="attachments" class="files" aria-label="Selected attachments" hidden></ul>
-<div class="form-actions"><label class="expiry"><span data-icon="clock"></span><span class="sr-only">Expires after</span><select id="expiry"><option value="3600">Expires in 1 hour</option><option value="86400" selected>Expires in 24 hours</option><option value="604800">Expires in 7 days</option></select><span class="chevron" data-icon="chevron"></span></label><button class="primary" id="create-button" type="submit"><span data-icon="bolt"></span> Generate code</button></div>
+<div class="custom-code">
+<label class="field-label" for="custom-code">Custom share code <span>Optional</span></label>
+<input id="custom-code" class="code-option" type="text" maxlength="24" placeholder="e.g. TEAM-NOTES" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-describedby="code-help">
+<p class="field-hint" id="code-help">4–24 letters, numbers, or hyphens. Leave blank for a random code.</p>
+</div>
+<div class="form-actions"><label class="expiry"><span data-icon="clock"></span><span class="sr-only">Expires after</span><select id="expiry"><option value="3600">Expires in 1 hour</option><option value="86400" selected>Expires in 24 hours</option><option value="604800">Expires in 7 days</option></select><span class="chevron" data-icon="chevron"></span></label><button class="primary" id="create-button" type="submit"><span data-icon="bolt"></span> Create clip</button></div>
 <p class="message" id="create-message" role="status" hidden></p>
 </form>
 <section class="result" id="created" aria-label="Your share code" hidden></section>
@@ -43,7 +48,7 @@
 <div class="panel-header"><span class="panel-icon" data-icon="key"></span><div><h2 id="retrieve-title">Open a clip</h2><p>Use a code, link, or teammate message.</p></div></div>
 <form id="retrieve-form">
 <label class="field-label" for="code">Code or share link</label>
-<div class="code-field"><input id="code" name="code" type="text" placeholder="e.g. J9K4-P2X7" autocomplete="off" autocapitalize="characters" spellcheck="false"><button class="text-button" id="paste-code" type="button"><span data-icon="clipboard"></span> Paste</button></div>
+<div class="code-field"><input id="code" name="code" type="text" placeholder="e.g. TEAM-NOTES" autocomplete="off" autocapitalize="characters" spellcheck="false"><button class="text-button" id="paste-code" type="button"><span data-icon="clipboard"></span> Paste</button></div>
 <button class="primary" id="retrieve-button" type="submit"><span data-icon="search"></span> Open clip</button>
 <p class="message" id="retrieve-message" role="status" hidden></p>
 </form>
@@ -65,6 +70,17 @@
 <div class="share-preview"><canvas id="share-qr" role="img" aria-label="QR code for the clip"></canvas><strong id="share-code"></strong></div>
 <div id="share-actions" class="result-actions"></div>
 <div class="dialog-status" id="share-status" role="status" hidden></div>
+</dialog>
+<dialog id="change-dialog" aria-labelledby="change-title">
+<form method="dialog"><button class="icon-button dialog-close" aria-label="Close code change" data-icon="close"></button></form>
+<h2 id="change-title">Change share code</h2>
+<p>The previous code, link, and QR code will stop opening this clip.</p>
+<form id="change-form">
+<label class="field-label" for="replacement-code">New code <span>Optional</span></label>
+<input id="replacement-code" class="code-option" type="text" maxlength="24" placeholder="Leave blank for a random code" autocomplete="off" autocapitalize="characters" spellcheck="false" autofocus>
+<p class="message" id="change-message" role="status" hidden></p>
+<button id="change-button" class="primary" type="submit">Change code</button>
+</form>
 </dialog>
 <div class="toast" id="toast" role="status" hidden></div>
 </body>

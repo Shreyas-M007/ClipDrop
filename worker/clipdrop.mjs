@@ -1,7 +1,9 @@
 const FILE_LIMIT = 10_000_000;
 const REQUEST_LIMIT = FILE_LIMIT + 300_000;
 const FILE_COUNT_LIMIT = 8;
-const CODE_PATTERN = /^[23456789A-HJ-NP-Z]{4}-[23456789A-HJ-NP-Z]{4}$/;
+const CODE_PATTERN = /^[A-Z0-9][A-Z0-9-]{2,22}[A-Z0-9]$/i;
+const COMPACT_GENERATED = /^[23456789A-HJ-NP-Z]{8}$/;
+const CODE_HELP = "Use 4–24 letters, numbers, or hyphens. Start and end with a letter or number.";
 const ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
 const EXPIRATIONS = new Set([3600, 86400, 604800]);
 const IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif", "image/avif", "image/bmp"]);
@@ -26,6 +28,35 @@ function error(message, status) {
 function shareCode() {
   const chars = Array.from(crypto.getRandomValues(new Uint8Array(8)), byte => ALPHABET[byte & 31]);
   return chars.slice(0, 4).join("") + "-" + chars.slice(4).join("");
+}
+
+function codeKey(code) {
+  return COMPACT_GENERATED.test(code) ? code.slice(0, 4) + "-" + code.slice(4) : code;
+}
+
+function requestedCode(form) {
+  const value = form.get("code") ?? "";
+  if (typeof value !== "string") return null;
+  const code = value.trim();
+  return !code || CODE_PATTERN.test(code) ? code.toUpperCase() : null;
+}
+
+async function reserveCode(bucket, displayCode, body, customMetadata) {
+  const key = "clips/" + codeKey(displayCode);
+  const metadata = { ...customMetadata, displayCode };
+  const reserved = await bucket.put(key, body, {
+    onlyIf: { etagDoesNotMatch: "*" }, customMetadata: metadata,
+  });
+  if (reserved) return true;
+  const previous = await bucket.head(key);
+  if (!previous || Number(previous.customMetadata.expiresAt) > Date.now()) return false;
+  const replaced = await bucket.put(key, body, {
+    onlyIf: { etagMatches: previous.etag }, customMetadata: metadata,
+  });
+  if (replaced && previous.customMetadata.metadataSize) {
+    await bucket.delete("state/" + previous.customMetadata.deleteHash).catch(() => {});
+  }
+  return Boolean(replaced);
 }
 
 function randomToken() {
@@ -67,13 +98,22 @@ async function readForm(request) {
   }
 }
 
+// Conditionally replace expired payloads with tiny markers so a late cleanup cannot erase a reused code.
+async function retirePayload(bucket, object) {
+  const { deleteHash } = object.customMetadata;
+  const retired = await bucket.put(object.key, deleteHash, {
+    onlyIf: { etagMatches: object.etag }, customMetadata: { expiresAt: "0" },
+  });
+  if (retired) await bucket.delete("state/" + deleteHash);
+}
+
 async function cleanExpired(bucket, now) {
   const prefix = "clips/";
-  const page = await bucket.list({
-    prefix, startAfter: prefix + shareCode(), limit: 30, include: ["customMetadata"],
-  });
-  const expired = page.objects.filter(object => Number(object.customMetadata?.expiresAt) <= now);
-  if (expired.length) await bucket.delete(expired.map(object => object.key));
+  const startAfter = Math.random() < 0.25 ? undefined : prefix + shareCode();
+  const page = await bucket.list({ prefix, startAfter, limit: 30, include: ["customMetadata"] });
+  const expired = page.objects.filter(object => object.customMetadata?.metadataSize &&
+    Number(object.customMetadata.expiresAt) <= now);
+  await Promise.all(expired.map(object => retirePayload(bucket, object)));
 }
 
 async function createClip(request, bucket, context) {
@@ -85,6 +125,8 @@ async function createClip(request, bucket, context) {
   }
   const text = typeof content === "string" ? content : await content.text();
   const duration = Number(form.get("expiry"));
+  const customCode = requestedCode(form);
+  if (customCode === null) return error(CODE_HELP, 400);
   const files = form.getAll("file");
   if (typeof text !== "string" || text.length > 50000) return error("Text can contain up to 50,000 characters.", 400);
   if (!EXPIRATIONS.has(duration)) return error("Choose an expiration time.", 400);
@@ -109,52 +151,97 @@ async function createClip(request, bucket, context) {
   const expiresAt = createdAt + duration * 1000;
   const deleteToken = randomToken();
   const deleteHash = await tokenHash(deleteToken);
-  const metadata = encoder.encode(JSON.stringify({ text, attachments, expiresAt }));
+  const metadata = encoder.encode(JSON.stringify({ text, attachments, expiresAt, deleteHash }));
   const object = new Blob([metadata, ...files]);
   for (let attempt = 0; attempt < 4; attempt++) {
-    const code = shareCode();
-    const saved = await bucket.put("clips/" + code, object, {
-      onlyIf: { etagDoesNotMatch: "*" },
-      customMetadata: { metadataSize: String(metadata.byteLength), expiresAt: String(expiresAt), deleteHash },
-    });
-    if (saved) {
+    const code = customCode || shareCode();
+    if (await reserveCode(bucket, code, object, {
+      metadataSize: String(metadata.byteLength), expiresAt: String(expiresAt), deleteHash,
+    })) {
       context.waitUntil(cleanExpired(bucket, createdAt).catch(() => {}));
       return json({ code, expiresAt, deleteToken }, 201);
     }
+    if (customCode) return error("That code is already in use. Try another one.", 409);
+  }
+  return error("Could not generate a code. Try again.", 503);
+}
+
+async function setActiveCode(bucket, stateKey, previous, code) {
+  return bucket.put(stateKey, JSON.stringify({ code }), {
+    onlyIf: previous ? { etagMatches: previous.etag } : { etagDoesNotMatch: "*" },
+  });
+}
+
+async function rotateClip(request, bucket, stateKey, state, rootCode, root, currentCode) {
+  const form = await readForm(request);
+  if (form instanceof Response) return form;
+  const customCode = requestedCode(form);
+  if (customCode === null) return error(CODE_HELP, 400);
+  const { expiresAt, deleteHash } = root.customMetadata;
+  if (Number(expiresAt) <= Date.now()) return error("This clip has expired.", 404);
+  if (customCode && codeKey(customCode) === currentCode) return error("This is already the clip’s code.", 409);
+
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const code = customCode || shareCode();
+    if (await reserveCode(bucket, code, deleteHash, { rootCode, expiresAt, deleteHash })) {
+      if (!await setActiveCode(bucket, stateKey, state, codeKey(code))) {
+        return error("This clip changed while you were updating it. Open its latest code to try again.", 409);
+      }
+      return json({ code, expiresAt: Number(expiresAt) });
+    }
+    if (customCode) return error("That code is already in use. Try another one.", 409);
   }
   return error("Could not generate a code. Try again.", 503);
 }
 
 async function openClip(request, bucket, context, code, fileIndex, preview) {
-  const key = "clips/" + code;
-  const object = await bucket.head(key);
-  if (!object) return error("Clip not found or expired. Check the share code.", 404);
-  const { expiresAt, metadataSize, deleteHash } = object.customMetadata;
+  const locator = await bucket.head("clips/" + code);
+  const missing = () => error("Clip not found or expired. Check the share code.", 404);
+  if (!locator) return missing();
+  const rootCode = locator.customMetadata.rootCode ?? code;
+  const key = "clips/" + rootCode;
+  const root = rootCode === code ? locator : await bucket.head(key);
+  if (!root || root.customMetadata.deleteHash !== locator.customMetadata.deleteHash || !root.customMetadata.metadataSize) {
+    return missing();
+  }
+  const { expiresAt, metadataSize, deleteHash } = root.customMetadata;
   if (Number(expiresAt) <= Date.now()) {
-    context.waitUntil(bucket.delete(key).catch(() => {}));
+    context.waitUntil(retirePayload(bucket, root).catch(() => {}));
     return error("This clip has expired.", 404);
   }
-  if (request.method === "DELETE") {
+
+  const stateKey = "state/" + deleteHash;
+  const state = await bucket.get(stateKey);
+  const active = state ? (await state.json()).code : rootCode;
+  if (active !== code) return missing();
+
+  if (request.method !== "GET") {
     const token = request.headers.get("Authorization")?.match(/^Bearer ([a-f0-9]{48})$/)?.[1];
-    if (!token || await tokenHash(token) !== deleteHash) return error("Only the creator can delete this clip.", 403);
-    await bucket.delete(key);
+    if (!token || await tokenHash(token) !== deleteHash) return error("Only the creator can change this clip.", 403);
+    if (request.method === "POST") return rotateClip(request, bucket, stateKey, state, rootCode, root, code);
+    if (!await setActiveCode(bucket, stateKey, state, null)) {
+      return error("This clip changed while you were deleting it. Try again.", 409);
+    }
+    await retirePayload(bucket, root);
     return new Response(null, { status: 204, headers: policy });
   }
-  const metadataObject = await bucket.get(key, { range: { offset: 0, length: Number(metadataSize) } });
-  if (!metadataObject) return error("Clip not found or expired.", 404);
+
+  const onlyIf = { etagMatches: root.etag };
+  const metadataObject = await bucket.get(key, { onlyIf, range: { offset: 0, length: Number(metadataSize) } });
+  if (!metadataObject?.body) return missing();
   const metadata = await metadataObject.json();
 
   if (fileIndex === undefined) {
     const attachments = metadata.attachments.map(({ name, type, size }) => ({ name, type, size }));
-    return json({ code, text: metadata.text, expiresAt: metadata.expiresAt, attachments });
+    return json({ code: locator.customMetadata.displayCode ?? code, text: metadata.text, expiresAt: metadata.expiresAt, attachments });
   }
 
   const file = metadata.attachments[Number(fileIndex)];
   if (!file || (preview && !IMAGE_TYPES.has(file.type))) return error("Attachment not found.", 404);
   const content = file.size ? await bucket.get(key, {
-    range: { offset: Number(metadataSize) + file.offset, length: file.size },
+    onlyIf, range: { offset: Number(metadataSize) + file.offset, length: file.size },
   }) : null;
-  if (file.size && !content) return error("Attachment not found.", 404);
+  if (file.size && !content?.body) return error("Attachment not found.", 404);
   const encodedName = encodeURIComponent(file.name.toWellFormed()).replace(/['()*]/g, char => "%" + char.charCodeAt(0).toString(16));
   return new Response(content?.body ?? null, { headers: {
     ...policy,
@@ -182,9 +269,10 @@ export function makeWorker(assets) {
       try {
         if (method === "POST" && pathname === "/api/clips") return await createClip(request, env.BUCKET, context);
         const match = pathname.match(/^\/api\/clips\/([^/]+)(?:\/files\/(\d+))?$/);
-        if (!match || (method !== "GET" && !(method === "DELETE" && !match[2]))) return error("Page not found.", 404);
-        if (!CODE_PATTERN.test(match[1])) return error("Enter an eight-character share code.", 400);
-        return await openClip(request, env.BUCKET, context, match[1], match[2], url.searchParams.has("preview"));
+        if (!match || (method !== "GET" && !(isMutation && !match[2]))) return error("Page not found.", 404);
+        if (!CODE_PATTERN.test(match[1])) return error(CODE_HELP, 400);
+        const code = codeKey(match[1].toUpperCase());
+        return await openClip(request, env.BUCKET, context, code, match[2], url.searchParams.has("preview"));
       } catch {
         return error("The clipboard service is temporarily unavailable. Try again in a moment.", 503);
       }
