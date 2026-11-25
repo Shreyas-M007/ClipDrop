@@ -27,15 +27,15 @@
   opacity: .72;
 }
 .launch-shell {
-  position: relative; width: min(1310px, calc(100% - 2 * var(--gutter))); margin-inline: auto;
+  position: relative; width: min(var(--container), calc(100% - 2 * var(--gutter))); margin-inline: auto;
   min-height: calc(100svh - var(--header-height)); display: grid;
   grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr); align-items: center;
   gap: clamp(10px, 2vw, 37px); padding: clamp(2.4rem, 6vh, 5.4rem) 0;
 }
 .launch-copy { position: relative; z-index: 3; }
 .launch-copy h1 {
-  margin: 0; font: 400 clamp(4.3rem, 11.1vw, 10rem)/.97 Anton, Impact, sans-serif;
-  letter-spacing: -.026em;
+  margin: 0; font: 400 clamp(4.3rem, 11.1vw, 10rem)/.97 var(--font-display);
+  letter-spacing: var(--display-tracking);
 }
 .launch-copy h1 span, .launch-copy h1 em { display: block; }
 .launch-copy h1 em { color: var(--poster-word); font-style: normal; text-shadow: 3px 4px 0 var(--poster-ink); }
@@ -47,18 +47,9 @@
   color: var(--poster-ink); font-size: clamp(.98rem, 1.45vw, 1.18rem);
   font-weight: 540; line-height: 1.5; text-wrap: pretty;
 }
-.launch-actions { display: flex; flex-wrap: wrap; gap: .65rem; margin-top: 1.35rem; }
-.button.launch-button {
-  min-height: 46px; padding: 10px 16px; border-radius: 999px; text-decoration: none;
-  border: 2px solid var(--poster-ink); box-shadow: 0 3px 0 var(--poster-ink);
-  transition: transform .15s, box-shadow .15s, background .15s;
-}
-.button.launch-button.primary { background: var(--poster-ink); color: var(--poster); }
-.button.launch-button.primary:hover { background: var(--poster-strong); color: var(--poster); }
-.button.launch-button.secondary { background: var(--poster-word); color: var(--poster-ink); }
-.button.launch-button.secondary:hover { background: var(--poster-pink); }
-.button.launch-button:active { box-shadow: 0 1px 0 var(--poster-ink); transform: translateY(2px); }
-.button.launch-button:focus-visible, .motion-toggle:focus-visible { outline-color: var(--poster-ink); }
+.launch-actions { display: flex; flex-wrap: wrap; gap: var(--space); margin-top: calc(3 * var(--space)); }
+.launch-button.primary { background: var(--poster-ink); color: var(--poster); }
+.launch-button.primary:not(:disabled):hover { background: var(--poster-strong); }
 
 .launch-stage { position: relative; min-width: 0; display: grid; place-items: center; }
 .launch-scene { position: relative; width: min(100%, 550px); aspect-ratio: 1.1; isolation: isolate; }
@@ -74,8 +65,8 @@
   box-shadow: 8px 14px 0 #1b3b2930, inset -6px -5px 0 #203d2344;
 }
 .roll-barrel b {
-  position: absolute; top: 41%; right: 9%; color: #21392a;
-  font: 400 clamp(1rem, 3.4vw, 2.9rem)/1 Anton, Impact, sans-serif;
+  position: absolute; top: 41%; right: 9%; color: var(--sticker-ink);
+  font: 400 clamp(1rem, 3.4vw, 2.9rem)/1 var(--font-display);
   letter-spacing: .035em; transform: rotate(12deg);
 }
 .roll-face {
@@ -102,22 +93,21 @@
 }
 .art-sticker {
   position: absolute; z-index: 3; display: inline-flex; justify-content: center; align-items: center; gap: 5px;
-  padding: clamp(6px, 1.2vw, 12px); border: 2px solid #21392a; border-radius: 8px;
-  color: #21392a; font-size: clamp(.7rem, 1.25vw, .96rem); font-weight: 800;
-  box-shadow: 4px 5px 0 #21392a; animation: sticker-sway 5.5s ease-in-out infinite;
+  padding: clamp(6px, 1.2vw, 12px); border: var(--outline-width) solid var(--sticker-ink); border-radius: var(--radius-sticker);
+  color: var(--sticker-ink); font-size: clamp(.7rem, 1.25vw, .96rem); font-weight: 800;
+  box-shadow: var(--shadow-sticker) var(--sticker-ink); animation: sticker-sway 5.5s ease-in-out infinite;
 }
 .art-sticker svg { width: clamp(16px, 2.1vw, 25px); height: auto; }
-.art-note { top: 14%; left: 8%; background: #fcdb69; --tilt: -10deg; }
-.art-file { top: 19%; right: 5%; background: #ffaac8; --tilt: 10deg; animation-delay: -1.5s; }
-.art-link { bottom: 8%; right: 12%; background: #a8c9ff; --tilt: -12deg; animation-delay: -3.7s; }
+.art-note { top: 14%; left: 8%; background: var(--sticker-yellow); --tilt: -10deg; }
+.art-file { top: 19%; right: 5%; background: var(--sticker-pink); --tilt: 10deg; animation-delay: -1.5s; }
+.art-link { bottom: 8%; right: 12%; background: var(--sticker-blue); --tilt: -12deg; animation-delay: -3.7s; }
 .art-stamp {
   position: absolute; top: 56%; left: 1%; z-index: 3; width: 12%; aspect-ratio: 1; display: grid; place-items: center;
-  border: 2px solid #21392a; border-radius: 50%; background: #fff5d3; color: #21392a;
+  border: var(--outline-width) solid var(--sticker-ink); border-radius: 50%; background: var(--sticker-cream); color: var(--sticker-ink);
   box-shadow: 2px 4px 0 #21392a; transform: rotate(12deg);
 }
 .art-stamp svg { width: 46%; height: auto; }
-.motion-toggle { position: absolute; bottom: 0; right: 0; z-index: 5; background: var(--poster-word); color: var(--poster-ink); border-color: var(--poster-ink); }
-.motion-toggle:hover { background: var(--poster-pink); }
+.motion-toggle { position: absolute; bottom: 0; right: 0; z-index: 5; }
 .motion-toggle .play-icon, .motion-toggle[data-paused] .pause-icon { display: none; }
 .motion-toggle[data-paused] .play-icon { display: block; }
 .launch-stage:not([data-running]) .launch-scene * { animation-play-state: paused; }
@@ -131,11 +121,11 @@
 }
 
 .scroll-tape {
-  position: relative; isolation: isolate; width: 100%; min-height: 39px; overflow: hidden;
-  background: var(--paper-stage); border-bottom: 2px solid var(--line);
+  position: relative; isolation: isolate; width: 100%; min-height: calc(6 * var(--space)); overflow: hidden;
+  background: var(--poster);
 }
 .scroll-tape::before {
-  position: absolute; content: ""; inset: 0 -50px; background:
+  position: absolute; content: ""; inset: 0 -50px; border-radius: 50% 50% 0 0 / 100% 100% 0 0; background:
     repeating-linear-gradient(115deg, transparent 0 18px, var(--tape-ink) 18px 20px, transparent 20px 28px),
     var(--tape);
   transform: skewX(-9deg);
@@ -157,7 +147,7 @@ html[data-motion-paused] .scroll-tape::before { animation: none; }
   .launch-scene { width: min(86%, 375px); }
   .motion-toggle { right: 0; }
 }
-@media (max-width: 380px) { .button.launch-button { padding-inline: 11px; } }
+@media (max-width: 380px) { .launch-button { padding-inline: var(--space); } }
 @media (prefers-reduced-motion: reduce) {
   .launch-scene *, .scroll-tape::before { animation: none !important; }
   .motion-toggle { display: none; }

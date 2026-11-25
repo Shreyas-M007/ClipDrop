@@ -8,8 +8,8 @@ export function RoomHero() {
           <h1 id="launch-title"><span>DROP IT.</span><em>SHARE IT.</em></h1>
           <p>Text, links, images, and files in one shared room. Invite anyone with a code or QR scan.</p>
           <div className="launch-actions">
-            <a className="button primary launch-button" href="#create">Create a room</a>
-            <a className="button secondary launch-button" href="#join">Join with a code</a>
+            <a className="btn btn-lg primary launch-button" href="#create">Create a room</a>
+            <a className="btn btn-lg secondary launch-button" href="#join">Join with a code</a>
           </div>
         </div>
         <div className="launch-stage" id="launch-stage">

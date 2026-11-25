@@ -19,7 +19,7 @@
   <div class="shell nav">
     <a class="brand" href="/" aria-label="Clipdrop home"><span class="brand-mark" data-icon="clipboard"></span><span class="brand-copy"><strong>Clipdrop</strong><span>Shared clipboard</span></span></a>
     <nav aria-label="Main navigation">
-      <a href="#join" id="join-nav">Join a room</a>
+      <a href="#join" class="btn btn-sm" id="join-nav">Join a room</a>
       <button type="button" class="icon-button" id="fullscreen" aria-label="Enter full screen" data-icon="expand" hidden></button>
       <button type="button" class="icon-button" id="theme" aria-label="Switch theme" data-icon="moon"></button>
     </nav>
@@ -47,7 +47,7 @@
           <div class="card-heading"><span class="tile-icon plain" data-icon="enter"></span><div><h2 id="join-title">Join a room</h2><p>Open a room your teammate shared.</p></div></div>
           <form id="join-form">
             <label for="join-code">Code or share link</label>
-            <div class="with-paste"><input id="join-code" class="mono-input" type="text" placeholder="e.g. DESIGN-TEAM" autocomplete="off" autocapitalize="characters" spellcheck="false"><button type="button" id="paste-code" aria-label="Paste room code" data-icon="clipboard"></button></div>
+            <div class="with-paste"><input id="join-code" class="mono-input" type="text" placeholder="e.g. DESIGN-TEAM" autocomplete="off" autocapitalize="characters" spellcheck="false"><button type="button" id="paste-code" class="icon-button" aria-label="Paste room code" data-icon="clipboard"></button></div>
             <p class="message" id="join-message" role="status" hidden></p>
             <button type="submit" class="button secondary solid full" id="join-button"><span data-icon="enter"></span> Join room</button>
           </form>
@@ -71,7 +71,7 @@
   <div id="room" class="shell room-shell" hidden>
     <div class="room-top">
       <a href="#" class="back-home">All rooms</a>
-      <button type="button" class="button secondary" id="share-room"><span data-icon="share"></span> Share room</button>
+      <button type="button" class="button btn-md secondary" id="share-room"><span data-icon="share"></span> Share room</button>
     </div>
     <section class="room-heading" aria-labelledby="room-title">
       <div><p class="room-kicker"><span></span> Shared room</p><h1 id="room-title" tabindex="-1"></h1><p>Anyone with the code can view and post.</p></div>
@@ -94,7 +94,7 @@
           <div id="room-screens"></div>
           <p id="screen-message" class="message" role="status" hidden></p>
         </div>
-        <button class="button secondary clear-room" id="reset-room" type="button">Clear room content</button>
+        <button class="button destructive clear-room" id="reset-room" type="button">Clear room content</button>
       </div>
     </details>
     <div class="room-grid">
