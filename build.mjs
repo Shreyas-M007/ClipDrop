@@ -77,7 +77,7 @@ await Promise.all(Object.entries(assets).map(([path, [, contents, encoding]]) =>
 }));
 
 if (process.argv.includes("--vercel") || process.env.VERCEL === "1") {
-  const backendUrl = process.env.CLIPDROP_BACKEND_URL?.trim();
+  const backendUrl = process.env.CLIPDROP_BACKEND_URL?.trim() || "https://clipdrop-share.bakedmandrill16.chatgpt.site";
   let origin;
   if (backendUrl) {
     const url = new URL(backendUrl);
