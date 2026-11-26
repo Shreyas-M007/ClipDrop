@@ -249,6 +249,10 @@ export function makeWorker(assets) {
       const url = new URL(request.url);
       const { pathname, origin } = url;
       const method = request.method;
+      if (method === "GET" && pathname === "/api/health") {
+        if (!env.BUCKET) return error("Room storage has not been configured for this deployment.", 503);
+        return json({ status: "ok" });
+      }
       if ((method === "GET" || method === "HEAD") && Object.hasOwn(assets, pathname)) {
         const [type, source, encoding] = assets[pathname];
         // Security headers are inherited from `policy`; binary assets additionally get a cache directive.
@@ -280,7 +284,9 @@ export function makeWorker(assets) {
       }
       const isMutation = method !== "GET" && method !== "HEAD";
       const isExtensionOrigin = requester?.startsWith("chrome-extension://") || requester?.startsWith("moz-extension://");
-      if (isMutation && requester && requester !== origin && !(isTypeQueue && isExtensionOrigin) && !isTypeQueue) {
+      const trustedWebOrigin = typeof env.CLIPDROP_WEB_ORIGINS === "string" &&
+        env.CLIPDROP_WEB_ORIGINS.split(",").some(value => value.trim() === requester);
+      if (isMutation && requester && requester !== origin && !trustedWebOrigin && !(isTypeQueue && isExtensionOrigin) && !isTypeQueue) {
         return error("Open Clipdrop to make changes.", 403);
       }
       if (!env.BUCKET) return error("Shared storage is currently unavailable.", 503);

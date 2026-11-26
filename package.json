@@ -3,6 +3,7 @@
   "type": "module",
   "scripts": {
     "build": "npm run build:styles && node build.mjs",
+    "build:vercel": "npm run build:styles && node build.mjs --vercel",
     "build:styles": "tailwindcss -i ./web/landing.css -o ./dist/landing.css --minify",
     "typecheck": "tsc --noEmit"
   },

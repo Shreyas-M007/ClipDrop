@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
 import { build } from "esbuild";
@@ -66,4 +66,52 @@ const backend = await build({
   // Tree-shake dead code aggressively; the worker has no dynamic requires
   treeShaking: true,
 });
-await writeFile(new URL("./dist/server/index.js", import.meta.url), backend.outputFiles[0].contents);
+const workerEntry = new URL("./dist/server/index.js", import.meta.url);
+await writeFile(workerEntry, backend.outputFiles[0].contents);
+
+const publicDir = new URL("./public/", import.meta.url);
+await mkdir(publicDir, { recursive: true });
+await Promise.all(Object.entries(assets).map(([path, [, contents, encoding]]) => {
+  const filename = path === "/" ? "index.html" : path.slice(1);
+  return writeFile(new URL(filename, publicDir), contents, encoding === "base64" ? "base64" : "utf8");
+}));
+
+if (process.argv.includes("--vercel") || process.env.VERCEL === "1") {
+  const backendUrl = process.env.CLIPDROP_BACKEND_URL?.trim();
+  let origin;
+  if (backendUrl) {
+    const url = new URL(backendUrl);
+    if (url.protocol !== "https:" || url.username || url.password || url.pathname !== "/" || url.search || url.hash) {
+      throw new Error("CLIPDROP_BACKEND_URL must be an HTTPS origin, such as https://clipdrop.roomdrop.workers.dev.");
+    }
+    origin = url.origin;
+  } else {
+    console.warn("CLIPDROP_BACKEND_URL is unset. The page will render, but room operations require a deployed Worker.");
+  }
+
+  const { default: app } = await import(workerEntry.href);
+  const output = new URL("./.vercel/output/", import.meta.url);
+  const staticDir = new URL("static/", output);
+  await rm(output, { recursive: true, force: true });
+  await cp(publicDir, staticDir, { recursive: true });
+
+  const escaped = path => path.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const headersByPolicy = new Map();
+  await Promise.all(Object.keys(assets).map(async path => {
+    const response = await app.fetch(new Request("https://clipdrop.invalid" + path, { method: "HEAD" }), {}, {});
+    const headers = Object.fromEntries(response.headers);
+    delete headers["content-type"];
+    const key = JSON.stringify(headers);
+    if (!headersByPolicy.has(key)) headersByPolicy.set(key, []);
+    headersByPolicy.get(key).push(path);
+    if (path === "/") headersByPolicy.get(key).push("/index.html");
+  }));
+  const routes = [...headersByPolicy].map(([headers, paths]) => ({
+    src: "^/(?:" + paths.sort().map(path => escaped(path.slice(1))).join("|") + ")$",
+    headers: JSON.parse(headers),
+    continue: true,
+  }));
+  if (origin) routes.unshift({ src: "^/((?:api/.*)|share-target)$", dest: origin + "/$1" });
+  routes.push({ src: "^/$", dest: "/index.html" }, { handle: "filesystem" });
+  await writeFile(new URL("config.json", output), JSON.stringify({ version: 3, routes }, null, 2) + "\n");
+}
