@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Create a shared Clipdrop room for text, links, images and files. Join with a code and post without an account.">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#0f172a" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f8fafc" media="(prefers-color-scheme: light)">
+<title>Clipdrop — Shared rooms</title>
+<link rel="icon" href="/clipdrop-mark.svg" type="image/svg+xml">
+<script src="/theme.js"></script>
+<link rel="preload" href="/inter.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/anton-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="/landing.css">
+<script src="/motion.js" type="module"></script>
+<script src="/app.js" type="module"></script>
+</head>
+<body>
+<header class="header">
+  <div class="shell nav">
+    <a class="brand" href="/" aria-label="Clipdrop home"><img class="brand-mark" src="/clipdrop-mark.svg" alt="" width="44" height="44"><span class="brand-copy"><strong>Clipdrop</strong><span>Shared clipboard</span></span></a>
+    <nav aria-label="Main navigation">
+      <a href="#join" class="btn btn-sm" id="join-nav">Join a room</a>
+      <button type="button" class="icon-button" id="fullscreen" aria-label="Enter full screen" data-icon="expand" hidden></button>
+      <button type="button" class="icon-button" id="theme" aria-label="Switch theme" data-icon="moon"></button>
+    </nav>
+  </div>
+</header>
+<main class="site-main">
+  <div id="home"><div class="tape-story"><div class="story-preloader" data-preloader="true" hidden="" aria-hidden="true"><div class="preloader-lockup"><span class="tape-wheel"><span></span></span><span>Clipdrop</span></div></div><section class="launch-hero" aria-labelledby="launch-title"><div class="launch-shell"><div class="launch-copy"><h1 id="launch-title" aria-label="DROP IT. SHARE IT."><span class="headline-line" aria-hidden="true"><span class="headline-word"><span class="headline-letter" data-letter="true">D</span><span class="headline-letter" data-letter="true">R</span><span class="headline-letter" data-letter="true">O</span><span class="headline-letter" data-letter="true">P</span></span><span class="headline-word"><span class="headline-letter" data-letter="true">I</span><span class="headline-letter" data-letter="true">T</span><span class="headline-letter" data-letter="true">.</span></span></span><em class="headline-line" aria-hidden="true"><span class="headline-word"><span class="headline-letter" data-letter="true">S</span><span class="headline-letter" data-letter="true">H</span><span class="headline-letter" data-letter="true">A</span><span class="headline-letter" data-letter="true">R</span><span class="headline-letter" data-letter="true">E</span></span><span class="headline-word"><span class="headline-letter" data-letter="true">I</span><span class="headline-letter" data-letter="true">T</span><span class="headline-letter" data-letter="true">.</span></span></em></h1><p>Text, links, images, and files in one shared room. Invite anyone with a code or QR scan.</p><div class="launch-actions"><a class="btn btn-lg primary launch-button" href="#create">Create a room</a><a class="btn btn-lg secondary launch-button" href="#join">Join with a code</a></div></div><div class="launch-stage" id="launch-stage"><div class="launch-scene" aria-hidden="true"><div class="roll-tail"></div><div class="launch-roll-drift" data-roll-drift="true"><div class="art-roll" data-hero-roll="true"><span class="roll-barrel"><b>Clipdrop</b></span><span class="roll-face"><i></i></span><span class="roll-glint"></span></div></div><div class="art-sticker art-note" data-hero-sticker="true"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-notebook-pen" aria-hidden="true"><path d="M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4"></path><path d="M2 6h4"></path><path d="M2 10h4"></path><path d="M2 14h4"></path><path d="M2 18h4"></path><path d="M21.378 5.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"></path></svg><span>TEXT</span></div><div class="art-sticker art-file" data-hero-sticker="true"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-file" aria-hidden="true"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"></path><path d="M14 2v5a1 1 0 0 0 1 1h5"></path></svg><span>FILES</span></div><div class="art-sticker art-link" data-hero-sticker="true"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-link-2" aria-hidden="true"><path d="M9 17H7A5 5 0 0 1 7 7h2"></path><path d="M15 7h2a5 5 0 1 1 0 10h-2"></path><line x1="8" x2="16" y1="12" y2="12"></line></svg><span>LINKS</span></div><div class="art-stamp"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-clipboard" aria-hidden="true"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"></rect><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path></svg></div></div><button class="icon-button motion-toggle" id="motion-toggle" type="button" aria-label="Pause landing animations" title="Pause landing animations" hidden=""><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-pause pause-icon" aria-hidden="true"><rect x="14" y="3" width="5" height="18" rx="1"></rect><rect x="5" y="3" width="5" height="18" rx="1"></rect></svg><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-play play-icon" aria-hidden="true"><path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z"></path></svg></button></div></div></section><div class="story-track" aria-hidden="true"><span class="story-trail" data-trail="true"></span><div class="story-spool" data-traveler="true"><span class="tape-wheel"><span></span></span></div></div><div class="story-seam" aria-hidden="true"><span data-seam="true"></span></div><section class="entry-stage story-section" id="story-rooms" aria-label="Room setup"><div class="room-forms">      <div class="shell landing-grid">
+        <section class="card entry-card" id="create" aria-labelledby="create-title">
+          <span class="form-tape" data-stamp aria-hidden="true"></span>
+          <div class="card-heading"><span class="tile-icon accent" data-icon="plus"></span><div><h2 id="create-title">Create a room</h2><p>Give your team a place to share.</p></div></div>
+          <form id="create-form">
+            <label for="room-name">Room name <span>Optional</span></label>
+            <input id="room-name" type="text" maxlength="60" placeholder="e.g. Design team" autocomplete="off">
+            <label for="room-code">Room code <span>Optional</span></label>
+            <input id="room-code" class="mono-input" type="text" maxlength="24" placeholder="e.g. DESIGN-TEAM" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-describedby="room-help">
+            <p class="field-hint" id="room-help">Choose a permanent code or leave it blank to generate one.</p>
+            <p class="message" id="create-message" role="status" hidden></p>
+            <button type="submit" class="button primary full" id="create-button"><span data-icon="plus"></span> Create room</button>
+          </form>
+        </section>
+        <section class="card entry-card" id="join" aria-labelledby="join-title">
+          <span class="form-tape" data-stamp aria-hidden="true"></span>
+          <div class="card-heading"><span class="tile-icon plain" data-icon="enter"></span><div><h2 id="join-title">Join a room</h2><p>Open a room your teammate shared.</p></div></div>
+          <form id="join-form">
+            <label for="join-code">Code or share link</label>
+            <div class="with-paste"><input id="join-code" class="mono-input" type="text" placeholder="e.g. DESIGN-TEAM" autocomplete="off" autocapitalize="characters" spellcheck="false"><button type="button" id="paste-code" class="icon-button" aria-label="Paste room code" data-icon="clipboard"></button></div>
+            <p class="message" id="join-message" role="status" hidden></p>
+            <button type="submit" class="button secondary solid full" id="join-button"><span data-icon="enter"></span> Join room</button>
+          </form>
+          <section id="recent" class="recent" aria-labelledby="recent-title" hidden>
+            <div class="recent-heading">
+              <h3 id="recent-title">Recent rooms</h3>
+              <button type="button" class="btn btn-sm secondary" id="clear-recent">Clear history</button>
+            </div>
+            <ul id="recent-list"></ul>
+          </section>
+        </section>
+      </div>
+</div></section><div class="story-seam" aria-hidden="true"><span data-seam="true"></span></div><div class="story-marquee" aria-hidden="true"><div class="marquee-belt flex" data-marquee="true"><div class="marquee-lap flex shrink-0"><span class="marquee-label">Clipdrop<!-- --> <span>✦</span> Pass it on <span>✦</span></span><span class="marquee-label">Clipdrop<!-- --> <span>✦</span> Pass it on <span>✦</span></span><span class="marquee-label">Clipdrop<!-- --> <span>✦</span> Pass it on <span>✦</span></span><span class="marquee-label">Clipdrop<!-- --> <span>✦</span> Pass it on <span>✦</span></span><span class="marquee-label">Clipdrop<!-- --> <span>✦</span> Pass it on <span>✦</span></span></div><div class="marquee-lap flex shrink-0"><span class="marquee-label">Clipdrop<!-- --> <span>✦</span> Pass it on <span>✦</span></span><span class="marquee-label">Clipdrop<!-- --> <span>✦</span> Pass it on <span>✦</span></span><span class="marquee-label">Clipdrop<!-- --> <span>✦</span> Pass it on <span>✦</span></span><span class="marquee-label">Clipdrop<!-- --> <span>✦</span> Pass it on <span>✦</span></span><span class="marquee-label">Clipdrop<!-- --> <span>✦</span> Pass it on <span>✦</span></span></div></div></div><section class="workflow-scene story-section" aria-labelledby="workflow-title"><div class="shell workflow-layout"><div class="workflow-stage"><div class="workflow-stage-card flex flex-col justify-between"><h2 id="workflow-title">Share in three steps</h2><div class="workflow-visual" aria-hidden="true"><div data-step-visual="true" class="workflow-slip"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-plus" aria-hidden="true"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg><span>Design team</span></div><div data-step-visual="true" class="workflow-slip"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-hash" aria-hidden="true"><line x1="4" x2="20" y1="9" y2="9"></line><line x1="4" x2="20" y1="15" y2="15"></line><line x1="10" x2="8" y1="3" y2="21"></line><line x1="16" x2="14" y1="3" y2="21"></line></svg><span>DESIGN-TEAM</span></div><div data-step-visual="true" class="workflow-slip"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-clipboard" aria-hidden="true"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"></rect><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path></svg><span>Ready to share!</span></div></div><div class="workflow-annotation" aria-hidden="true">Pass it on! <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-arrow-down" aria-hidden="true"><path d="M12 5v14"></path><path d="m19 12-7 7-7-7"></path></svg></div><div class="workflow-meter" aria-hidden="true"><span data-workflow-progress="true"></span></div></div></div><ol class="workflow-steps"><li class="workflow-step" data-step="true"><div class="card workflow-ticket"><span class="workflow-number" aria-hidden="true">0<!-- -->1</span><h3>Make a room.</h3><p>Name your room and choose a code or generate one automatically.</p></div></li><li class="workflow-step" data-step="true"><div class="card workflow-ticket"><span class="workflow-number" aria-hidden="true">0<!-- -->2</span><h3>Pass the code.</h3><p>Share a link, room code, or QR so your teammates can jump straight in.</p></div></li><li class="workflow-step" data-step="true"><div class="card workflow-ticket"><span class="workflow-number" aria-hidden="true">0<!-- -->3</span><h3>Drop it in.</h3><p>Post a note, link, image, or file. Everyone in the room can pick it up.</p></div></li></ol></div></section><div class="story-seam" aria-hidden="true"><span data-seam="true"></span></div><section class="content-types story-section" aria-labelledby="types-title"><div class="shell"><h2 id="types-title">What you can share</h2><div class="type-grid"><article class="card type-tile" data-product="text"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-notebook-pen" aria-hidden="true"><path d="M13.4 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7.4"></path><path d="M2 6h4"></path><path d="M2 10h4"></path><path d="M2 14h4"></path><path d="M2 18h4"></path><path d="M21.378 5.626a1 1 0 1 0-3.004-3.004l-5.01 5.012a2 2 0 0 0-.506.854l-.837 2.87a.5.5 0 0 0 .62.62l2.87-.837a2 2 0 0 0 .854-.506z"></path></svg><h3>Text</h3><p>Notes, snippets, and ideas.</p></article><article class="card type-tile" data-product="links"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-link-2" aria-hidden="true"><path d="M9 17H7A5 5 0 0 1 7 7h2"></path><path d="M15 7h2a5 5 0 1 1 0 10h-2"></path><line x1="8" x2="16" y1="12" y2="12"></line></svg><h3>Links</h3><p>Resources and references.</p></article><article class="card type-tile" data-product="images"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-image" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"></rect><circle cx="9" cy="9" r="2"></circle><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"></path></svg><h3>Images</h3><p>Screenshots and visuals.</p></article><article class="card type-tile" data-product="files"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-file" aria-hidden="true"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"></path><path d="M14 2v5a1 1 0 0 0 1 1h5"></path></svg><h3>Files</h3><p>Documents and attachments.</p></article></div></div></section><div class="story-seam" aria-hidden="true"><span data-seam="true"></span></div><footer class="story-footer story-section"><div class="shell flex flex-col items-start"><div class="footer-lockup"><p class="story-wordmark" data-wordmark="true">Clipdrop<!-- -->.</p><span class="footer-tape" data-footer-tape="true" aria-hidden="true"></span></div><p>Anyone with a room code can join. No account needed.</p></div></footer></div></div>
+  <div id="room" class="shell room-shell" hidden>
+    <div class="room-top">
+      <a href="#" class="back-home">All rooms</a>
+      <button type="button" class="button btn-md secondary" id="share-room"><span data-icon="share"></span> Share room</button>
+    </div>
+    <section class="room-heading" aria-labelledby="room-title">
+      <div><p class="room-kicker"><span></span> Shared room</p><h1 id="room-title" tabindex="-1"></h1><p>Anyone with the code can view and post.</p></div>
+      <button type="button" class="code-chip" id="copy-room-code" title="Copy room code"><span data-icon="hash"></span><strong id="active-code"></strong><span data-icon="clipboard"></span></button>
+    </section>
+    <div class="room-grid">
+      <section class="card composer" aria-labelledby="post-title">
+        <div class="card-heading"><span class="tile-icon accent" data-icon="plus"></span><div><h2 id="post-title">Add a post</h2><p>Choose what you’re sharing.</p></div></div>
+        <form id="post-form">
+          <fieldset class="formats">
+            <legend class="sr-only">Post type</legend>
+            <label><input type="radio" name="kind" value="text" checked><span>Text</span></label>
+            <label><input type="radio" name="kind" value="links"><span>Link</span></label>
+            <label><input type="radio" name="kind" value="images"><span>Images</span></label>
+            <label><input type="radio" name="kind" value="files"><span>Files</span></label>
+          </fieldset>
+          <div id="text-field"><label for="post-text">Text</label><textarea id="post-text" maxlength="50000" placeholder="Paste or write a note…"></textarea></div>
+          <div id="link-field" hidden><label for="post-link">Link</label><input id="post-link" type="url" disabled maxlength="2048" placeholder="https://example.com"></div>
+          <div id="upload-field" hidden>
+            <input id="post-files" type="file" multiple hidden>
+            <button class="drop" type="button" id="pick-files"><span data-icon="upload"></span><strong>Choose files or drop them here</strong><small>Up to 8 files · 10 MB total</small></button>
+            <button class="button secondary" type="button" id="pick-folder" hidden>Choose a folder</button>
+            <input id="folder-input" type="file" webkitdirectory multiple hidden>
+            <ul class="attachment-list" id="selected-files" aria-label="Selected attachments" hidden></ul>
+          </div>
+          <label class="sensitive-option"><input id="sensitive" type="checkbox"> Burn after reading or 60 seconds</label>
+          <p class="message" id="post-message" role="status" hidden></p>
+          <button type="submit" class="button primary full" id="post-button"><span data-icon="plus"></span> Post to room</button>
+        </form>
+      </section>
+      <section class="card board" aria-labelledby="board-title">
+        <div class="board-top"><h2 id="board-title">Room board</h2><button type="button" class="icon-button" id="refresh" aria-label="Refresh room board" data-icon="refresh"></button></div>
+        <div class="filters" role="group" aria-label="Filter posts">
+          <button type="button" data-filter="all" aria-pressed="true">All</button>
+          <button type="button" data-filter="text" aria-pressed="false">Text</button>
+          <button type="button" data-filter="links" aria-pressed="false">Links</button>
+          <button type="button" data-filter="images" aria-pressed="false">Images</button>
+          <button type="button" data-filter="files" aria-pressed="false">Files</button>
+        </div>
+        <p class="message" id="board-message" role="status" hidden></p>
+        <div id="posts" class="posts"></div>
+        <div id="empty" class="empty" hidden><span class="tile-icon plain" data-icon="grid"></span><h3 id="empty-title">The board is empty</h3><p id="empty-copy">Add the first post to get the room started.</p></div>
+        <button type="button" id="more" class="button secondary full" hidden>Load older posts</button>
+      </section>
+    </div>
+  </div>
+  <section id="old-clip" class="shell card old-clip" hidden aria-labelledby="old-title">
+    <a href="#" class="back-home">All rooms</a><h1 id="old-title" tabindex="-1">Shared clip</h1>
+    <div id="old-content"></div>
+  </section>
+</main>
+<footer class="shell footer"><span class="footer-brand"><img src="/clipdrop-mark.svg" alt="" width="28" height="28">Clipdrop.</span><span>Anyone with a room code can join. No account needed.</span></footer>
+<dialog id="share-dialog" aria-labelledby="share-title">
+  <form method="dialog"><button type="submit" class="icon-button dialog-close" aria-label="Close sharing" data-icon="close"></button></form>
+  <h2 id="share-title">Share this room</h2><p>Scan to join, or send the code or link to your teammates.</p>
+  <div class="share-preview"><canvas id="share-qr" role="img" aria-label="QR code for this room"></canvas><strong id="share-code"></strong></div>
+  <div class="dialog-actions" id="share-actions"></div><p id="share-status" role="status" hidden></p>
+</dialog>
+<dialog id="post-dialog" aria-labelledby="detail-title">
+  <form method="dialog"><button type="submit" class="icon-button dialog-close" aria-label="Close post" data-icon="close"></button></form>
+  <h2 id="detail-title">Room post</h2><div id="detail-body" aria-live="polite"></div><p id="detail-status" role="status" hidden></p>
+</dialog>
+<div class="toast" id="toast" role="status" hidden></div>
+</body>
+</html>
