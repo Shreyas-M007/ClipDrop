@@ -9,7 +9,7 @@ function safePath(value) {
   return parts.join('/');
 }
 
-export async function zipFolder(entries, limit = 100_000_000, name = 'folder.zip') {
+export async function zipFolder(entries, limit = 500_000_000, name = 'folder.zip') {
   if (!entries.length) throw new Error('Choose a folder with contents.');
   const names = new Set();
   let inputSize = 0;
@@ -20,9 +20,9 @@ export async function zipFolder(entries, limit = 100_000_000, name = 'folder.zip
     inputSize += file?.size ?? 0;
     return { key, file };
   });
-  if (inputSize > 100_000_000) {
+  if (inputSize > 500_000_000) {
     const mb = (inputSize / (1024 * 1024)).toFixed(1);
-    throw new Error(`Folder exceeds the 100 MB limit (${mb} MB). Please choose a folder under 100 MB.`);
+    throw new Error(`Folder exceeds the 500 MB limit (${mb} MB). Please choose a folder under 500 MB.`);
   }
 
   const chunks = [];
@@ -30,7 +30,7 @@ export async function zipFolder(entries, limit = 100_000_000, name = 'folder.zip
   let failure;
   const zip = new Zip((error, chunk) => {
     if (error) failure = error;
-    else if ((size += chunk.length) > limit) failure = new Error('Compressed folder exceeds the 100 MB limit. Please keep total under 100 MB.');
+    else if ((size += chunk.length) > limit) failure = new Error('Compressed folder exceeds the 500 MB limit. Please keep total under 500 MB.');
     else chunks.push(chunk);
   });
   try {
