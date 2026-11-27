@@ -11,7 +11,6 @@ function safePath(value) {
 
 export async function zipFolder(entries, limit = 100_000_000, name = 'folder.zip') {
   if (!entries.length) throw new Error('Choose a folder with contents.');
-  if (entries.length > 10000) throw new Error('A folder can contain up to 10,000 entries.');
   const names = new Set();
   let inputSize = 0;
   const sources = entries.map(({ path, file }) => {

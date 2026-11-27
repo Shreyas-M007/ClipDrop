@@ -3,7 +3,6 @@ export function directoryFiles(files) {
 }
 
 async function walk(entry, prefix, result) {
-  if (result.length >= 10000) throw new Error('A folder can contain up to 10,000 entries.');
   const path = prefix ? prefix + '/' + entry.name : entry.name;
   if (entry.isFile) {
     const file = await new Promise((resolve, reject) => entry.file(resolve, reject));
