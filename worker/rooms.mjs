@@ -159,7 +159,7 @@ async function handleRooms(request, bucket, url, context) {
     (route.endsWith("/claim") && method === "POST") ||
     (!route.endsWith("/claim") && route !== "type-queue" && method === "DELETE")
   );
-  const validPostMethod = post && (post[4] ? method === "POST" : method === "GET");
+  const validPostMethod = post && (post[4] ? method === "POST" : (method === "GET" || method === "DELETE"));
   if (!workspace && !screen && !validTypeQueueMethod && !validPostMethod && !(route === "posts" && (method === "GET" || method === "POST")) &&
     !(route === "" && method === "GET")) return error("Room codes are permanent.", 405);
 
@@ -173,8 +173,15 @@ async function handleRooms(request, bucket, url, context) {
   if (screen) return handleScreen(request, bucket, context, partition, route);
   if (typeQueue) return handleTypeQueue(request, bucket, context, partition, route);
   if (workspace) return handleWorkspace(request, bucket, context, key, object, room, partition, route);
-  if (post) return readRoomPost(request, bucket, context, partition, post[1], post[2], post[3],
-    post[4] ? "claim" : searchParams.has("stream") ? "stream" : searchParams.has("preview") ? "preview" : "download");
+  if (post) {
+    if (method === "DELETE") {
+      const postKey = partition + "/posts/" + post[1] + "/" + post[2];
+      await bucket.delete(postKey);
+      return new Response(null, { status: 204, headers: policy });
+    }
+    return readRoomPost(request, bucket, context, partition, post[1], post[2], post[3],
+      post[4] ? "claim" : searchParams.has("stream") ? "stream" : searchParams.has("preview") ? "preview" : "download");
+  }
   if (route === "posts") return method === "POST" ? addRoomPost(request, bucket, partition, key, room) :
     listRoomPosts(request, bucket, partition, searchParams, context);
   return json({ ...room, generation: generation(room) });
