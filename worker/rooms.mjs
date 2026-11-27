@@ -44,7 +44,7 @@ async function addRoomPost(request, bucket, key, roomKey, room) {
   }
   const files = form.getAll("file");
   if (files.length > FILE_COUNT_LIMIT || files.some(file => typeof file === "string")) {
-    return error("Add up to eight files per post.", 400);
+    return error("Add up to 50 files per post.", 400);
   }
   const attachmentPost = kind === "images" || kind === "files";
   if (attachmentPost && !files.length) return error("Add at least one attachment.", 400);

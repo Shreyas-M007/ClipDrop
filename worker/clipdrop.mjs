@@ -1,6 +1,6 @@
 const FILE_LIMIT = 100_000_000;
 const REQUEST_LIMIT = FILE_LIMIT + 500_000;
-const FILE_COUNT_LIMIT = 8;
+const FILE_COUNT_LIMIT = 50;
 const FILE_INDEX_LIMIT = FILE_COUNT_LIMIT - 1; // max valid file index (0-based)
 const CODE_PATTERN = /^[A-Z0-9][A-Z0-9-]{2,22}[A-Z0-9]$/i;
 const COMPACT_GENERATED = /^[23456789A-HJ-NP-Z]{8}$/;
