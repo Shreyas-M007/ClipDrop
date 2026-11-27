@@ -21,14 +21,17 @@ export async function zipFolder(entries, limit = 100_000_000, name = 'folder.zip
     inputSize += file?.size ?? 0;
     return { key, file };
   });
-  if (inputSize > 100_000_000) throw new Error('The folder exceeds 100 MB before compression.');
+  if (inputSize > 100_000_000) {
+    const mb = (inputSize / (1024 * 1024)).toFixed(1);
+    throw new Error(`Folder exceeds the 100 MB limit (${mb} MB). Please choose a folder under 100 MB.`);
+  }
 
   const chunks = [];
   let size = 0;
   let failure;
   const zip = new Zip((error, chunk) => {
     if (error) failure = error;
-    else if ((size += chunk.length) > limit) failure = new Error('The ZIP exceeds 100 MB.');
+    else if ((size += chunk.length) > limit) failure = new Error('Compressed folder exceeds the 100 MB limit. Please keep total under 100 MB.');
     else chunks.push(chunk);
   });
   try {
