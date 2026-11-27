@@ -56,7 +56,7 @@ async function addRoomPost(request, bucket, key, roomKey, room) {
   }
 
   const { attachments, total } = describeFiles(files);
-  if (total > FILE_LIMIT) return error("Attachments can total up to 10 MB per post.", 413);
+  if (total > FILE_LIMIT) return error("Attachments can total up to 100 MB per post.", 413);
   if (kind === "images" && attachments.some(file => !IMAGE_TYPES.has(file.type))) {
     return error("Use PNG, JPEG, WebP, GIF, AVIF, or BMP for an image post.", 400);
   }

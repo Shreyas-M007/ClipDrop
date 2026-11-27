@@ -1,5 +1,5 @@
-const FILE_LIMIT = 10_000_000;
-const REQUEST_LIMIT = FILE_LIMIT + 300_000;
+const FILE_LIMIT = 100_000_000;
+const REQUEST_LIMIT = FILE_LIMIT + 500_000;
 const FILE_COUNT_LIMIT = 8;
 const FILE_INDEX_LIMIT = FILE_COUNT_LIMIT - 1; // max valid file index (0-based)
 const CODE_PATTERN = /^[A-Z0-9][A-Z0-9-]{2,22}[A-Z0-9]$/i;
@@ -156,7 +156,7 @@ async function createClip(request, bucket, context) {
   }
 
   const { attachments, total } = describeFiles(files);
-  if (total > FILE_LIMIT) return error("Attachments can total up to 10 MB.", 413);
+  if (total > FILE_LIMIT) return error("Attachments can total up to 100 MB.", 413);
 
   const createdAt = Date.now();
   const expiresAt = createdAt + duration * 1000;

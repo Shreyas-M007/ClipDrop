@@ -1,5 +1,5 @@
 export function directoryFiles(files) {
-  return [...files].map(file => ({ file, path: file.webkitRelativePath || file.name }));
+  return [...files].map(file => ({ file, path: (file.webkitRelativePath || file.name).replace(/\\+/g, '/') }));
 }
 
 async function walk(entry, prefix, result) {

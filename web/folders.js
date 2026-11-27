@@ -1,14 +1,15 @@
 import { Zip, ZipDeflate, ZipPassThrough } from 'fflate';
 
 function safePath(value) {
-  const parts = value.split('/');
-  if (parts.some(part => !part || part === '.' || part === '..' || /[:\\\x00-\x1f]/.test(part))) {
+  const normalized = value.replace(/\\+/g, '/').replace(/^\/+/, '');
+  const parts = normalized.split('/');
+  if (parts.some(part => !part || part === '.' || part === '..' || /[\x00-\x1f]/.test(part))) {
     throw new Error('A folder entry has an invalid path.');
   }
   return parts.join('/');
 }
 
-export async function zipFolder(entries, limit, name = 'folder.zip') {
+export async function zipFolder(entries, limit = 100_000_000, name = 'folder.zip') {
   if (!entries.length) throw new Error('Choose a folder with contents.');
   if (entries.length > 10000) throw new Error('A folder can contain up to 10,000 entries.');
   const names = new Set();
@@ -20,14 +21,14 @@ export async function zipFolder(entries, limit, name = 'folder.zip') {
     inputSize += file?.size ?? 0;
     return { key, file };
   });
-  if (inputSize > limit) throw new Error('The folder exceeds the host’s file limit before compression.');
+  if (inputSize > 100_000_000) throw new Error('The folder exceeds 100 MB before compression.');
 
   const chunks = [];
   let size = 0;
   let failure;
   const zip = new Zip((error, chunk) => {
     if (error) failure = error;
-    else if ((size += chunk.length) > limit) failure = new Error('The ZIP exceeds the host’s file limit.');
+    else if ((size += chunk.length) > limit) failure = new Error('The ZIP exceeds 100 MB.');
     else chunks.push(chunk);
   });
   try {
